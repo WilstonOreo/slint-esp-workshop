@@ -63,31 +63,31 @@ impl Platform for Esp32Platform {
 
 
 fn main() {
+    use esp_idf_svc::hal::sys::*;
 
     /* Initialize I2C (for touch and audio) */
-    unsafe { esp_idf_svc::hal::sys::bsp_i2c_init(); }
+    unsafe { bsp_i2c_init(); }
 
-    use esp_idf_svc::hal::*;
     
-    let mut io_handle: sys::esp_lcd_panel_io_handle_t = std::ptr::null_mut();
-    let mut panel_handle: sys::esp_lcd_panel_handle_t = std::ptr::null_mut();
+    let mut io_handle: esp_lcd_panel_io_handle_t = std::ptr::null_mut();
+    let mut panel_handle: esp_lcd_panel_handle_t = std::ptr::null_mut();
 
 
     const DISPLAY_WIDTH: usize = 320;
     const DISPLAY_HEIGHT: usize = 240;
     const DRAW_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT; // @todo find constants
 
-    let bsp_disp_cfg = sys::bsp_display_config_t {
+    let bsp_disp_cfg = bsp_display_config_t {
         max_transfer_sz: (DRAW_BUFFER_SIZE * std::mem::size_of::<slint::platform::software_renderer::Rgb565Pixel>()) as i32,
     };
 
     let mut touch_handle = std::ptr::null_mut();
-    let bsp_touch_cfg = sys::bsp_touch_config_t::default();
+    let bsp_touch_cfg = bsp_touch_config_t::default();
 
     unsafe {
-        sys::bsp_display_new(&bsp_disp_cfg, &mut panel_handle, &mut io_handle);
-        sys::bsp_touch_new(&bsp_touch_cfg, &mut touch_handle);
-        sys::bsp_display_backlight_on();
+        bsp_display_new(&bsp_disp_cfg, &mut panel_handle, &mut io_handle);
+        bsp_touch_new(&bsp_touch_cfg, &mut touch_handle);
+        bsp_display_backlight_on();
     }
     
 
