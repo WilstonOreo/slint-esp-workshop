@@ -61,14 +61,44 @@ impl Platform for Esp32Platform {
     }
 }
 
+
 fn main() {
+
+    /* Initialize I2C (for touch and audio) */
+    unsafe { esp_idf_svc::hal::sys::bsp_i2c_init(); }
+
+    use esp_idf_svc::hal::*;
+    
+    let mut io_handle: sys::esp_lcd_panel_io_handle_t = std::ptr::null_mut();
+    let mut panel_handle: sys::esp_lcd_panel_handle_t = std::ptr::null_mut();
+
+
+    const DISPLAY_WIDTH: usize = 320;
+    const DISPLAY_HEIGHT: usize = 240;
+    const DRAW_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT; // @todo find constants
+
+    let bsp_disp_cfg = sys::bsp_display_config_t {
+        max_transfer_sz: (DRAW_BUFFER_SIZE * std::mem::size_of::<slint::platform::software_renderer::Rgb565Pixel>()) as i32,
+    };
+
+    let mut touch_handle = std::ptr::null_mut();
+    let bsp_touch_cfg = sys::bsp_touch_config_t::default();
+
+    unsafe {
+        sys::bsp_display_new(&bsp_disp_cfg, &mut panel_handle, &mut io_handle);
+        sys::bsp_touch_new(&bsp_touch_cfg, &mut touch_handle);
+        sys::bsp_display_backlight_on();
+    }
+    
+
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
+
     esp_idf_svc::sys::link_patches();
 
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
-
+    
     // Configure platform for Slint
     let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(Default::default());
 
@@ -78,19 +108,13 @@ fn main() {
     }))
     .unwrap();
 
-    const DISPLAY_WIDTH: usize = 320;
-    const DISPLAY_HEIGHT: usize = 240;
 
     use slint::platform::software_renderer::Rgb565Pixel;
-    let mut buffer1 = [Rgb565Pixel(0); DISPLAY_WIDTH * DISPLAY_HEIGHT];
-    let mut buffer2 = [Rgb565Pixel(0); DISPLAY_WIDTH * DISPLAY_HEIGHT];
+    let mut buffer = [Rgb565Pixel(0); DISPLAY_WIDTH * DISPLAY_HEIGHT];
 
     // ... configure the screen driver to use buffer1 or buffer2 ...
 
     // ... rest of initialization ...
-
-    let mut currently_displayed_buffer: &mut [_] = &mut buffer1;
-    let mut work_buffer: &mut [_] = &mut buffer2;
 
     log::info!("Hello, world!");
     loop {
@@ -108,19 +132,15 @@ fn main() {
 
         // Draw the scene if something needs to be drawn.
         window.draw_if_needed(|renderer| {
-            // The screen driver might be taking some time to do the swap. We need to wait until
-            // work_buffer is ready to be written in
-            while is_swap_pending() {}
 
             // Do the rendering!
-            renderer.render(work_buffer, DISPLAY_WIDTH);
+            renderer.render(&mut buffer, DISPLAY_WIDTH);
 
             // tell the screen driver to display the other buffer.
             swap_buffers();
 
             // Swap the buffer references for our next iteration
             // (this just swap the reference, not the actual data)
-            core::mem::swap::<&mut [_]>(&mut work_buffer, &mut currently_displayed_buffer);
         });
 
         // Try to put the MCU to sleep
