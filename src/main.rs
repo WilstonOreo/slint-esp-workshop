@@ -101,7 +101,8 @@ impl Platform for EspPlatform {
                                 ),
                                 button: slint::platform::PointerEventButton::Left,
                             });
-                        self.window.dispatch_event(slint::platform::WindowEvent::PointerExited); 
+                        self.window
+                            .dispatch_event(slint::platform::WindowEvent::PointerExited);
                         touch_down = false;
                     }
 
