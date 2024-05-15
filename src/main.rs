@@ -108,12 +108,10 @@ impl Platform for EspPlatform {
 
                     // Draw the scene if something needs to be drawn.
                     self.window.draw_if_needed(|renderer| {
-                        log::info!("Render frame...");
                         // Do the rendering!
                         let region = renderer.render(&mut buffer, self.size.width as usize);
 
                         for (o, s) in region.iter() {
-                            log::info!("Render region: {:?} {:?}", o, s);
                             for y in o.y..(o.y + s.height as i32) {
                                 let flip_y = self.size.height as i32 - y - 1;
                                 for x in o.x..(o.x + s.width as i32) {
