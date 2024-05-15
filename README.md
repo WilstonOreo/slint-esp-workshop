@@ -14,7 +14,7 @@ espup install
 For each new terminal session, you need to set up the environment:
 
 ```shell
-. /home/micha/export-esp.sh
+. ${HOME}/export-esp.sh
 ```
 
 ## Build and run
