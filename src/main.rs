@@ -38,6 +38,7 @@ impl Platform for EspPlatform {
             }
 
             esp_lcd_panel_disp_on_off(self.panel_handle, true);
+            esp_lcd_panel_mirror(self.panel_handle, true, false);
 
             let mut last_touch_x = 0;
             let mut last_touch_y = 0;
@@ -113,8 +114,9 @@ impl Platform for EspPlatform {
                         for (o, s) in region.iter() {
                             log::info!("Render region: {:?} {:?}", o, s);
                             for y in o.y..(o.y + s.height as i32) {
+                                let flip_y = self.size.height as i32 - y - 1;
                                 for x in o.x..(o.x + s.width as i32) {
-                                    let offset = (y * self.size.width as i32 + x) as usize;
+                                    let offset = (flip_y * self.size.width as i32 +  x) as usize;
                                     let pixel = buffer[offset].0;
                                     // Convert pixel to big endian
                                     let pixel = ((pixel & 0xff) << 8) | ((pixel & 0xff00) >> 8);
@@ -130,7 +132,7 @@ impl Platform for EspPlatform {
                                     y + 1,
                                     buffer
                                         .as_ptr()
-                                        .add((y * self.size.width as i32 + o.x) as usize)
+                                        .add((flip_y * self.size.width as i32 + o.x) as usize)
                                         .cast::<c_void>(),
                                 );
                             }
