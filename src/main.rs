@@ -178,6 +178,11 @@ fn create_slint_app() -> AppWindow {
 fn main() {
     use esp_idf_svc::hal::sys::*;
 
+    // It is necessary to call this function once. Otherwise some patches to the runtime
+    // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
+
+    esp_idf_svc::sys::link_patches();
+
     /* Initialize I2C (for touch and audio) */
     unsafe {
         bsp_i2c_init();
@@ -201,11 +206,6 @@ fn main() {
         bsp_touch_new(&bsp_touch_cfg, &mut touch_handle);
         bsp_display_backlight_on();
     }
-
-    // It is necessary to call this function once. Otherwise some patches to the runtime
-    // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
-
-    esp_idf_svc::sys::link_patches();
 
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
