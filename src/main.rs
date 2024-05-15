@@ -92,7 +92,6 @@ impl Platform for EspPlatform {
 
                         touch_down = true;
                     } else if touch_down {
-                        touch_down = false;
                         self.window
                             .dispatch_event(slint::platform::WindowEvent::PointerReleased {
                                 position: slint::LogicalPosition::new(
@@ -101,6 +100,8 @@ impl Platform for EspPlatform {
                                 ),
                                 button: slint::platform::PointerEventButton::Left,
                             });
+                        self.window.dispatch_event(slint::platform::WindowEvent::PointerExited); 
+                        touch_down = false;
                     }
 
                     // Draw the scene if something needs to be drawn.
