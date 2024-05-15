@@ -78,7 +78,6 @@ impl Platform for EspPlatform {
                             });
 
                         if !touch_down {
-                            touch_down = true;
                             self.window.dispatch_event(
                                 slint::platform::WindowEvent::PointerPressed {
                                     position: slint::LogicalPosition::new(
@@ -88,6 +87,7 @@ impl Platform for EspPlatform {
                                     button: slint::platform::PointerEventButton::Left,
                                 },
                             );
+                            log::info!("Touchpad pressed: {:?} {:?}", last_touch_x, last_touch_y);
                         }
 
                         touch_down = true;
