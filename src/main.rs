@@ -204,6 +204,10 @@ fn main() {
 
     // Configure platform for Slint
     let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(Default::default());
+    window.set_size(slint::PhysicalSize::new(
+        DISPLAY_WIDTH as u32,
+        DISPLAY_HEIGHT as u32,
+    ));
 
     slint::platform::set_platform(alloc::boxed::Box::new(EspPlatform {
         size: slint::PhysicalSize::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
