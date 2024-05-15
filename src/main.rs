@@ -43,6 +43,9 @@ impl Platform for EspPlatform {
             let mut last_touch_y = 0;
             let mut touch_down = false;
 
+            use slint::platform::software_renderer::Rgb565Pixel;
+            let mut buffer = vec![Rgb565Pixel(0xf800); DRAW_BUFFER_SIZE];
+
             loop {
                 slint::platform::update_timers_and_animations();
 
