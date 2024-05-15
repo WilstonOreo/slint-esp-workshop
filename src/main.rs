@@ -103,25 +103,23 @@ impl Platform for EspPlatform {
                             });
                     }
 
-                    use slint::platform::software_renderer::Rgb565Pixel;
-                    let mut buffer = [Rgb565Pixel(0); DRAW_BUFFER_SIZE];
-
-
                     // Draw the scene if something needs to be drawn.
-                    self.window.clone().draw_if_needed(move|renderer| {
+                    self.window.draw_if_needed(|renderer| {
+                        log::info!("Render frame...");
                         // Do the rendering!
                         let region = renderer.render(&mut buffer, self.size.width as usize);
 
                         for (o, s) in region.iter() {
-                            for y in o.y..(s.height as i32) {
-                                for x in o.x..(s.width as i32) {
-                                    let offset = (y * s.width as i32 + x) as usize;
+                            log::info!("Render region: {:?} {:?}", o, s);
+                            for y in o.y..(o.y + s.height as i32) {
+                                for x in o.x..(o.x + s.width as i32) {
+                                    let offset = (y * self.size.width as i32 + x) as usize;
                                     let pixel = buffer[offset].0;
                                     // Convert pixel to big endian
                                     let pixel = ((pixel & 0xff) << 8) | ((pixel & 0xff00) >> 8);
                                     buffer[offset].0 = pixel;
                                 }
-                                
+
                                 use std::ffi::c_void;
                                 esp_lcd_panel_draw_bitmap(
                                     self.panel_handle,
@@ -129,7 +127,10 @@ impl Platform for EspPlatform {
                                     y,
                                     o.x + s.width as i32,
                                     y + 1,
-                                    buffer.as_ptr().wrapping_add((y * self.size.width as i32 + o.x) as usize).cast::<c_void>(),
+                                    buffer
+                                        .as_ptr()
+                                        .add((y * self.size.width as i32 + o.x) as usize)
+                                        .cast::<c_void>(),
                                 );
                             }
                         }
@@ -149,7 +150,7 @@ use alloc::rc::Rc;
 
 slint::include_modules!();
 
-use slint::platform::{software_renderer::MinimalSoftwareWindow, Platform, WindowEvent};
+use slint::platform::{software_renderer::MinimalSoftwareWindow, Platform};
 
 fn create_slint_app() -> AppWindow {
     let ui = AppWindow::new().expect("Failed to load UI");
@@ -200,7 +201,6 @@ fn main() {
     // Configure platform for Slint
     let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(Default::default());
 
-
     slint::platform::set_platform(alloc::boxed::Box::new(EspPlatform {
         size: slint::PhysicalSize::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
         panel_handle,
@@ -208,6 +208,7 @@ fn main() {
         window: window.clone(),
     }))
     .unwrap();
+    window.set_fullscreen(true);
 
     create_slint_app().run().unwrap();
 }
