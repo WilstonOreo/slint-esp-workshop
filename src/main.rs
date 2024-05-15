@@ -2,7 +2,6 @@ extern crate alloc;
 
 use esp_idf_svc::hal::sys::*;
 
-
 const DISPLAY_WIDTH: usize = 320;
 const DISPLAY_HEIGHT: usize = 240;
 const DRAW_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT; // @todo find constants
@@ -33,15 +32,6 @@ impl Platform for EspPlatform {
         unsafe {
             //self.task = xTaskGetCurrentTaskHandle(); // @fixme How to set task handle?
             esp_lcd_panel_disp_on_off(self.panel_handle, true);
-
-            let mut max_ticks_to_wait: u16 = 0xffff; // = portMAX_DELAY
-
-            if let Some(touch_handle) = self.touch_handle {
-                //@fixme: How to handle touch interrupts and where is vTaskNotifyGiveFromISR defined?
-                //if esp_lcd_touch_register_interrupt_callback(touch_handle, move || { vTaskNotifyGiveFromISR(self.task, core::ptr::null_mut()); }) != 0 {
-                //    return Err(slint::PlatformError::FailedToRegisterTouchInterrupt);
-                //}
-            }
 
             let mut last_touch_x = 0;
             let mut last_touch_y = 0;
@@ -141,20 +131,9 @@ impl Platform for EspPlatform {
                         continue;
                     }
                 }
-
-/* 
-        TickType_t ticks_to_wait = max_ticks_to_wait;
-        if (auto wait_time = slint::platform::duration_until_next_timer_update()) {
-            ticks_to_wait = std::min(ticks_to_wait, pdMS_TO_TICKS(wait_time->count()));
-        }
-
-        ulTaskNotifyTake(/*reset to zero*/ pdTRUE, ticks_to_wait); */
             }
         }
     }
-
-    //vTaskDelete(NULL);
-
 }
 
 use alloc::rc::Rc;
@@ -190,7 +169,6 @@ fn main() {
 
     let mut io_handle: esp_lcd_panel_io_handle_t = std::ptr::null_mut();
     let mut panel_handle: esp_lcd_panel_handle_t = std::ptr::null_mut();
-
 
     let bsp_disp_cfg = bsp_display_config_t {
         max_transfer_sz: (DRAW_BUFFER_SIZE
