@@ -30,7 +30,13 @@ impl Platform for EspPlatform {
     // optional: You can put the event loop there, or in the main function, see later
     fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
         unsafe {
-            //self.task = xTaskGetCurrentTaskHandle(); // @fixme How to set task handle?
+            if esp_lcd_panel_init(self.panel_handle) != ESP_OK {
+                log::error!("Failed to initialize LCD panel");
+                return Err(slint::PlatformError::Other(
+                    "Failed to initialize LCD panel".into(),
+                ));
+            }
+
             esp_lcd_panel_disp_on_off(self.panel_handle, true);
 
             let mut last_touch_x = 0;
