@@ -7,7 +7,6 @@ const DISPLAY_HEIGHT: usize = 240;
 const DRAW_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT; // @todo find constants
 
 struct EspPlatform {
-    size: slint::PhysicalSize,
     panel_handle: esp_lcd_panel_handle_t,
     touch_handle: Option<*mut esp_lcd_touch_s>,
     window: Rc<MinimalSoftwareWindow>,
@@ -109,12 +108,12 @@ impl Platform for EspPlatform {
                     // Draw the scene if something needs to be drawn.
                     self.window.draw_if_needed(|renderer| {
                         // Do the rendering!
-                        let region = renderer.render(&mut buffer, self.size.width as usize);
+                        let region = renderer.render(&mut buffer, DISPLAY_WIDTH as usize);
 
                         for (o, s) in region.iter() {
                             for y in o.y..(o.y + s.height as i32) {
                                 for x in o.x..(o.x + s.width as i32) {
-                                    let offset = (y * self.size.width as i32 +  x) as usize;
+                                    let offset = (y * DISPLAY_WIDTH as i32 + x) as usize;
                                     let pixel = buffer[offset].0;
                                     // Convert pixel to big endian
                                     let pixel = ((pixel & 0xff) << 8) | ((pixel & 0xff00) >> 8);
@@ -130,7 +129,7 @@ impl Platform for EspPlatform {
                                     y + 1,
                                     buffer
                                         .as_ptr()
-                                        .add((y * self.size.width as i32 + o.x) as usize)
+                                        .add((y * DISPLAY_WIDTH as i32 + o.x) as usize)
                                         .cast::<c_void>(),
                                 );
                             }
@@ -207,7 +206,6 @@ fn main() {
     ));
 
     slint::platform::set_platform(alloc::boxed::Box::new(EspPlatform {
-        size: slint::PhysicalSize::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
         panel_handle,
         touch_handle: Some(touch_handle),
         window: window.clone(),
