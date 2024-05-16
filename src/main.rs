@@ -22,8 +22,8 @@ impl Platform for EspPlatform {
     }
     fn duration_since_start(&self) -> core::time::Duration {
         unsafe {
-            let ticks = xTaskGetTickCount(); // @fixme Are ticks in microseconds?
-            core::time::Duration::from_millis(ticks as u64)
+            let ticks = xTaskGetTickCount(); // One tick is 10ms, according to sdkconfig.defaults
+            core::time::Duration::from_millis(ticks as u64 * 10)
         }
     }
     // optional: You can put the event loop there, or in the main function, see later
