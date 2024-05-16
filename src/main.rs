@@ -39,8 +39,7 @@ impl Platform for EspPlatform {
             esp_lcd_panel_disp_on_off(self.panel_handle, true);
             esp_lcd_panel_mirror(self.panel_handle, true, true);
 
-            let mut last_touch_x = 0;
-            let mut last_touch_y = 0;
+            let mut last_position = slint::LogicalPosition::default();
             let mut touch_down = false;
 
             use slint::platform::software_renderer::Rgb565Pixel;
@@ -66,38 +65,29 @@ impl Platform for EspPlatform {
                     );
 
                     if touchpad_pressed && touchpad_cnt[0] > 0 {
-                        last_touch_x = touchpad_x[0] as i32;
-                        last_touch_y = touchpad_y[0] as i32;
+                        last_position =
+                            slint::LogicalPosition::new(touchpad_x[0] as f32, touchpad_y[0] as f32);
 
                         self.window
                             .dispatch_event(slint::platform::WindowEvent::PointerMoved {
-                                position: slint::LogicalPosition::new(
-                                    last_touch_x as f32,
-                                    last_touch_y as f32,
-                                ),
+                                position: last_position,
                             });
 
                         if !touch_down {
                             self.window.dispatch_event(
                                 slint::platform::WindowEvent::PointerPressed {
-                                    position: slint::LogicalPosition::new(
-                                        last_touch_x as f32,
-                                        last_touch_y as f32,
-                                    ),
+                                    position: last_position,
                                     button: slint::platform::PointerEventButton::Left,
                                 },
                             );
-                            log::info!("Touchpad pressed: {:?} {:?}", last_touch_x, last_touch_y);
+                            log::info!("Touchpad pressed: {:?}", last_position);
                         }
 
                         touch_down = true;
                     } else if touch_down {
                         self.window
                             .dispatch_event(slint::platform::WindowEvent::PointerReleased {
-                                position: slint::LogicalPosition::new(
-                                    last_touch_x as f32,
-                                    last_touch_y as f32,
-                                ),
+                                position: last_position,
                                 button: slint::platform::PointerEventButton::Left,
                             });
                         self.window
