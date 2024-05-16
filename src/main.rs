@@ -1,33 +1,77 @@
 extern crate alloc;
 
-use esp_idf_svc::hal::sys::*;
-
-const DISPLAY_WIDTH: usize = 320;
-const DISPLAY_HEIGHT: usize = 240;
-const DRAW_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT; // @todo find constants
-
 struct EspPlatform {
-    panel_handle: esp_lcd_panel_handle_t,
-    touch_handle: Option<*mut esp_lcd_touch_s>,
-    window: Rc<MinimalSoftwareWindow>,
+    panel_handle: esp_idf_svc::hal::sys::esp_lcd_panel_handle_t,
+    touch_handle: Option<*mut esp_idf_svc::hal::sys::esp_lcd_touch_s>,
+    window: alloc::rc::Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
 }
 
-impl Platform for EspPlatform {
+impl EspPlatform {
+    const DISPLAY_WIDTH: usize = 320;
+    const DISPLAY_HEIGHT: usize = 240;
+    const DRAW_BUFFER_SIZE: usize = Self::DISPLAY_WIDTH * Self::DISPLAY_HEIGHT;
+
+    fn new() -> std::boxed::Box<Self> {
+        use esp_idf_svc::hal::sys::*;
+
+        /* Initialize I2C (for touch and audio) */
+        unsafe {
+            bsp_i2c_init();
+        }
+
+        // Initialize LCD panel and touch
+        let mut io_handle: esp_lcd_panel_io_handle_t = std::ptr::null_mut();
+        let mut panel_handle: esp_lcd_panel_handle_t = std::ptr::null_mut();
+
+        let bsp_disp_cfg = bsp_display_config_t {
+            max_transfer_sz: (Self::DRAW_BUFFER_SIZE
+                * std::mem::size_of::<slint::platform::software_renderer::Rgb565Pixel>())
+                as i32,
+        };
+
+        let mut touch_handle: *mut esp_lcd_touch_s = std::ptr::null_mut();
+        let bsp_touch_cfg = bsp_touch_config_t::default();
+
+        unsafe {
+            bsp_display_new(&bsp_disp_cfg, &mut panel_handle, &mut io_handle);
+            bsp_touch_new(&bsp_touch_cfg, &mut touch_handle);
+            bsp_display_backlight_on();
+        }
+
+        // Setup the window
+        let window =
+            slint::platform::software_renderer::MinimalSoftwareWindow::new(Default::default());
+        window.set_size(slint::PhysicalSize::new(
+            Self::DISPLAY_WIDTH as u32,
+            Self::DISPLAY_HEIGHT as u32,
+        ));
+
+        std::boxed::Box::new(Self {
+            panel_handle,
+            touch_handle: Some(touch_handle),
+            window,
+        })
+    }
+}
+
+impl slint::platform::Platform for EspPlatform {
     fn create_window_adapter(
         &self,
-    ) -> Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError> {
+    ) -> Result<alloc::rc::Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError> {
         // Since on MCUs, there can be only one window, just return a clone of self.window.
         // We'll also use the same window in the event loop.
         Ok(self.window.clone())
     }
     fn duration_since_start(&self) -> core::time::Duration {
         unsafe {
-            let ticks = xTaskGetTickCount(); // One tick is 10ms, according to sdkconfig.defaults
+            let ticks = esp_idf_svc::hal::sys::xTaskGetTickCount(); // One tick is 10ms, according to sdkconfig.defaults
             core::time::Duration::from_millis(ticks as u64 * 10)
         }
     }
     // optional: You can put the event loop there, or in the main function, see later
     fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
+        use esp_idf_svc::hal::sys::*;
+
         unsafe {
             if esp_lcd_panel_init(self.panel_handle) != ESP_OK {
                 log::error!("Failed to initialize LCD panel");
@@ -43,7 +87,7 @@ impl Platform for EspPlatform {
             let mut touch_down = false;
 
             use slint::platform::software_renderer::Rgb565Pixel;
-            let mut buffer = vec![Rgb565Pixel(0x0); DRAW_BUFFER_SIZE];
+            let mut buffer = vec![Rgb565Pixel(0x0); Self::DRAW_BUFFER_SIZE];
 
             loop {
                 slint::platform::update_timers_and_animations();
@@ -98,12 +142,12 @@ impl Platform for EspPlatform {
                     // Draw the scene if something needs to be drawn.
                     self.window.draw_if_needed(|renderer| {
                         // Do the rendering!
-                        let region = renderer.render(&mut buffer, DISPLAY_WIDTH as usize);
+                        let region = renderer.render(&mut buffer, Self::DISPLAY_WIDTH as usize);
 
                         for (o, s) in region.iter() {
                             for y in o.y..(o.y + s.height as i32) {
                                 for x in o.x..(o.x + s.width as i32) {
-                                    let offset = (y * DISPLAY_WIDTH as i32 + x) as usize;
+                                    let offset = (y * Self::DISPLAY_WIDTH as i32 + x) as usize;
                                     let pixel = buffer[offset].0;
                                     // Convert pixel to big endian
                                     let pixel = ((pixel & 0xff) << 8) | ((pixel & 0xff00) >> 8);
@@ -119,7 +163,7 @@ impl Platform for EspPlatform {
                                     y + 1,
                                     buffer
                                         .as_ptr()
-                                        .add((y * DISPLAY_WIDTH as i32 + o.x) as usize)
+                                        .add((y * Self::DISPLAY_WIDTH as i32 + o.x) as usize)
                                         .cast::<c_void>(),
                                 );
                             }
@@ -136,11 +180,8 @@ impl Platform for EspPlatform {
     }
 }
 
-use alloc::rc::Rc;
 
 slint::include_modules!();
-
-use slint::platform::{software_renderer::MinimalSoftwareWindow, Platform};
 
 fn create_slint_app() -> AppWindow {
     let ui = AppWindow::new().expect("Failed to load UI");
@@ -155,51 +196,14 @@ fn create_slint_app() -> AppWindow {
 }
 
 fn main() {
-    use esp_idf_svc::hal::sys::*;
-
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
 
-    /* Initialize I2C (for touch and audio) */
-    unsafe {
-        bsp_i2c_init();
-    }
-
-    let mut io_handle: esp_lcd_panel_io_handle_t = std::ptr::null_mut();
-    let mut panel_handle: esp_lcd_panel_handle_t = std::ptr::null_mut();
-
-    let bsp_disp_cfg = bsp_display_config_t {
-        max_transfer_sz: (DRAW_BUFFER_SIZE
-            * std::mem::size_of::<slint::platform::software_renderer::Rgb565Pixel>())
-            as i32,
-    };
-
-    let mut touch_handle: *mut esp_lcd_touch_s = std::ptr::null_mut();
-    let bsp_touch_cfg = bsp_touch_config_t::default();
-
-    unsafe {
-        bsp_display_new(&bsp_disp_cfg, &mut panel_handle, &mut io_handle);
-        bsp_touch_new(&bsp_touch_cfg, &mut touch_handle);
-        bsp_display_backlight_on();
-    }
-
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    // Configure platform for Slint
-    let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(Default::default());
-    window.set_size(slint::PhysicalSize::new(
-        DISPLAY_WIDTH as u32,
-        DISPLAY_HEIGHT as u32,
-    ));
-
-    slint::platform::set_platform(alloc::boxed::Box::new(EspPlatform {
-        panel_handle,
-        touch_handle: Some(touch_handle),
-        window: window.clone(),
-    }))
-    .unwrap();
+    slint::platform::set_platform(EspPlatform::new()).unwrap();
 
     create_slint_app().run().unwrap();
 }
