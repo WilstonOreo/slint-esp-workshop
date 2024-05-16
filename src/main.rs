@@ -11,6 +11,7 @@ impl EspPlatform {
     const DISPLAY_HEIGHT: usize = 240;
     const DRAW_BUFFER_SIZE: usize = Self::DISPLAY_WIDTH * Self::DISPLAY_HEIGHT;
 
+    /// Create a new instance of the platform
     fn new() -> std::boxed::Box<Self> {
         use esp_idf_svc::hal::sys::*;
 
@@ -68,11 +69,11 @@ impl slint::platform::Platform for EspPlatform {
             core::time::Duration::from_millis(ticks as u64 * 10)
         }
     }
-    // optional: You can put the event loop there, or in the main function, see later
     fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
         use esp_idf_svc::hal::sys::*;
 
         unsafe {
+            // Initialize the LCD panel
             if esp_lcd_panel_init(self.panel_handle) != ESP_OK {
                 log::error!("Failed to initialize LCD panel");
                 return Err(slint::PlatformError::Other(
@@ -80,12 +81,16 @@ impl slint::platform::Platform for EspPlatform {
                 ));
             }
 
+            // Turn on the display
             esp_lcd_panel_disp_on_off(self.panel_handle, true);
+
+            // Calling this function rotates the display by 180 degrees
             esp_lcd_panel_mirror(self.panel_handle, true, true);
 
             let mut last_position = slint::LogicalPosition::default();
             let mut touch_down = false;
 
+            // Create a buffer to draw the scene
             use slint::platform::software_renderer::Rgb565Pixel;
             let mut buffer = vec![Rgb565Pixel(0x0); Self::DRAW_BUFFER_SIZE];
 
@@ -138,48 +143,51 @@ impl slint::platform::Platform for EspPlatform {
                             .dispatch_event(slint::platform::WindowEvent::PointerExited);
                         touch_down = false;
                     }
+                }
 
-                    // Draw the scene if something needs to be drawn.
-                    self.window.draw_if_needed(|renderer| {
-                        // Do the rendering!
-                        let region = renderer.render(&mut buffer, Self::DISPLAY_WIDTH as usize);
+                // Draw the scene if something needs to be drawn.
+                self.window.draw_if_needed(|renderer| {
+                    // Do the rendering!
+                    let region = renderer.render(&mut buffer, Self::DISPLAY_WIDTH as usize);
 
-                        for (o, s) in region.iter() {
-                            for y in o.y..(o.y + s.height as i32) {
-                                for x in o.x..(o.x + s.width as i32) {
-                                    let offset = (y * Self::DISPLAY_WIDTH as i32 + x) as usize;
-                                    let pixel = buffer[offset].0;
-                                    // Convert pixel to big endian
-                                    let pixel = ((pixel & 0xff) << 8) | ((pixel & 0xff00) >> 8);
-                                    buffer[offset].0 = pixel;
-                                }
-
-                                use std::ffi::c_void;
-                                esp_lcd_panel_draw_bitmap(
-                                    self.panel_handle,
-                                    o.x,
-                                    y,
-                                    o.x + s.width as i32,
-                                    y + 1,
-                                    buffer
-                                        .as_ptr()
-                                        .add((y * Self::DISPLAY_WIDTH as i32 + o.x) as usize)
-                                        .cast::<c_void>(),
-                                );
+                    // Iterate each region to be updated
+                    for (o, s) in region.iter() {
+                        // Update the display line by line
+                        for y in o.y..(o.y + s.height as i32) {
+                            for x in o.x..(o.x + s.width as i32) {
+                                let offset = (y * Self::DISPLAY_WIDTH as i32 + x) as usize;
+                                let pixel = buffer[offset].0;
+                                // Convert pixel to big endian
+                                let pixel = ((pixel & 0xff) << 8) | ((pixel & 0xff00) >> 8);
+                                buffer[offset].0 = pixel;
                             }
-                        }
-                    });
 
-                    // Try to put the MCU to sleep
-                    if !self.window.has_active_animations() {
-                        continue;
+                            use std::ffi::c_void;
+
+                            // This is the magic function that sends the buffer to the display
+                            esp_lcd_panel_draw_bitmap(
+                                self.panel_handle,
+                                o.x,
+                                y,
+                                o.x + s.width as i32,
+                                y + 1,
+                                buffer
+                                    .as_ptr()
+                                    .add((y * Self::DISPLAY_WIDTH as i32 + o.x) as usize)
+                                    .cast::<c_void>(),
+                            );
+                        }
                     }
+                });
+
+                // Try to put the MCU to sleep
+                if !self.window.has_active_animations() {
+                    continue;
                 }
             }
         }
     }
 }
-
 
 slint::include_modules!();
 
@@ -203,7 +211,9 @@ fn main() {
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
 
+    // Set the platform
     slint::platform::set_platform(EspPlatform::new()).unwrap();
 
+    // Finally, run the app!
     create_slint_app().run().unwrap();
 }
