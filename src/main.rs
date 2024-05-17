@@ -193,31 +193,35 @@ impl slint::platform::Platform for EspPlatform {
 
 slint::include_modules!();
 
-fn create_slint_app() -> AppWindow {
+static mut temp: f32 = 0.0;
+static mut hum: f32 = 0.0;
+
+fn create_slint_app() {
     let ui = AppWindow::new().expect("Failed to load UI");
 
     let ui_handle = ui.as_weak();
-    ui.on_request_increase_value(move || {
+    let timer = slint::Timer::default();
+    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(2000), move || {
         let ui = ui_handle.unwrap();
-        ui.set_counter(ui.get_counter() + 1);
+        unsafe {
+            ui.set_temperature(temp);
+            ui.set_humidity(hum);    
+        }
     });
 
-    ui
+    ui.run().unwrap();
 }
 
 unsafe extern "C" fn dht_task(_: *mut core::ffi::c_void) {
     //let dht = slint::platform::dht::Dht::new(4).unwrap();
-    let mut last_temperature = 0.0_f32;
-    let mut last_humidity = 0.0_f32;
-
     let dht = dht22::DHT22::new(13);
 
     loop {
         match dht.read() {
             Ok((temperature, humidity)) => {
-                if temperature != last_temperature || humidity != last_humidity {
-                    last_temperature = temperature;
-                    last_humidity = humidity;
+                if temperature != temp || humidity != hum {
+                    temp = temperature;
+                    hum = humidity;
                     log::info!("Temperature: {:.2}°C, Humidity: {:.2}%", temperature, humidity);
                 }
             }
@@ -259,5 +263,5 @@ fn main() {
     }
 
     // Finally, run the app!
-    create_slint_app().run().unwrap();
+    create_slint_app();
 }
