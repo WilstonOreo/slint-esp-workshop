@@ -203,6 +203,26 @@ fn create_slint_app() -> AppWindow {
     ui
 }
 
+unsafe extern "C" fn dht_task(_: *mut core::ffi::c_void) {
+    //let dht = slint::platform::dht::Dht::new(4).unwrap();
+    let mut last_temperature = 0.0_f32;
+    let mut last_humidity = 0.0_f32;
+
+    loop {
+        let (temperature, humidity) = (0.0_f32, 0.0_f32); // dht.read().unwrap();
+        //if temperature != last_temperature || humidity != last_humidity {
+            last_temperature = temperature;
+            last_humidity = humidity;
+            log::info!("Temperature: {:.2}°C, Humidity: {:.2}%", temperature, humidity);
+        //}
+
+        unsafe {
+            esp_idf_svc::sys::vTaskDelay(2000 / 10);
+        }
+    }
+
+}
+
 fn main() {
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
@@ -213,6 +233,20 @@ fn main() {
 
     // Set the platform
     slint::platform::set_platform(EspPlatform::new()).unwrap();
+
+    // Create DHT task
+    unsafe {
+        let mut task_handle = std::ptr::null_mut();
+        esp_idf_svc::sys::xTaskCreatePinnedToCore(
+            Some(dht_task),
+            b"sensor_task\0".as_ptr() as *const i8,
+            4096,
+            std::ptr::null_mut(),
+            5,
+            &mut task_handle,
+            1
+        );
+    }
 
     // Finally, run the app!
     create_slint_app().run().unwrap();
