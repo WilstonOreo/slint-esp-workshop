@@ -1,5 +1,7 @@
 extern crate alloc;
 
+mod dht22;
+
 struct EspPlatform {
     panel_handle: esp_idf_svc::hal::sys::esp_lcd_panel_handle_t,
     touch_handle: Option<*mut esp_idf_svc::hal::sys::esp_lcd_touch_s>,
@@ -208,13 +210,21 @@ unsafe extern "C" fn dht_task(_: *mut core::ffi::c_void) {
     let mut last_temperature = 0.0_f32;
     let mut last_humidity = 0.0_f32;
 
+    let dht = dht22::DHT22::new(13);
+
     loop {
-        let (temperature, humidity) = (0.0_f32, 0.0_f32); // dht.read().unwrap();
-        //if temperature != last_temperature || humidity != last_humidity {
-            last_temperature = temperature;
-            last_humidity = humidity;
-            log::info!("Temperature: {:.2}°C, Humidity: {:.2}%", temperature, humidity);
-        //}
+        match dht.read() {
+            Ok((temperature, humidity)) => {
+                if temperature != last_temperature || humidity != last_humidity {
+                    last_temperature = temperature;
+                    last_humidity = humidity;
+                    log::info!("Temperature: {:.2}°C, Humidity: {:.2}%", temperature, humidity);
+                }
+            }
+            Err(e) => {
+                log::error!("Error reading DHT22: {:?}", e);
+            }
+        }
 
         unsafe {
             esp_idf_svc::sys::vTaskDelay(2000 / 10);
