@@ -100,7 +100,7 @@ impl slint::platform::Platform for EspPlatform {
                 if let Some(touch_handle) = self.touch_handle {
                     let mut touchpad_x = [0];
                     let mut touchpad_y = [0];
-                    let mut touchpad_cnt = [0 as u8];
+                    let mut touchpad_cnt = [0_u8];
 
                     esp_lcd_touch_read_data(touch_handle);
 
