@@ -4,8 +4,8 @@ mod esp32;
 
 slint::include_modules!();
 
-static mut temp: f32 = 0.0;
-static mut hum: f32 = 0.0;
+static mut TEMPERATURE: f32 = 0.0;
+static mut HUMIDITY: f32 = 0.0;
 
 fn create_slint_app() {
     let ui = AppWindow::new().expect("Failed to load UI");
@@ -15,8 +15,8 @@ fn create_slint_app() {
     timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(2000), move || {
         let ui = ui_handle.unwrap();
         unsafe {
-            ui.set_temperature(temp);
-            ui.set_humidity(hum);    
+            ui.set_temperature(TEMPERATURE);
+            ui.set_humidity(HUMIDITY);    
         }
     });
 
@@ -30,9 +30,9 @@ unsafe extern "C" fn dht_task(_: *mut core::ffi::c_void) {
     loop {
         match dht.read() {
             Ok((temperature, humidity)) => {
-                if temperature != temp || humidity != hum {
-                    temp = temperature;
-                    hum = humidity;
+                if temperature != TEMPERATURE || humidity != HUMIDITY {
+                    TEMPERATURE = temperature;
+                    HUMIDITY = humidity;
                     log::info!("Temperature: {:.2}°C, Humidity: {:.2}%", temperature, humidity);
                 }
             }
