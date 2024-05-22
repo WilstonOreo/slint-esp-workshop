@@ -110,7 +110,6 @@ impl DHT22 {
 
         // == get humidity from Data[0] and Data[1] ==========================
         let mut humidity = dht_data[0] as f32;
-        humidity = dht_data[0] as f32;
         humidity *= 0x100 as f32; // >> 8
         humidity += dht_data[1] as f32;
         humidity /= 10.0; // get the decimal
