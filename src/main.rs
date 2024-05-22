@@ -2,10 +2,12 @@
 mod dht22;
 mod esp32;
 
+use core::sync::atomic::Ordering;
+
 slint::include_modules!();
 
-static mut TEMPERATURE: f32 = 0.0;
-static mut HUMIDITY: f32 = 0.0;
+static TEMPERATURE: portable_atomic::AtomicF32 = portable_atomic::AtomicF32::new(0.0);
+static HUMIDITY: portable_atomic::AtomicF32 = portable_atomic::AtomicF32::new(0.0);
 
 fn create_slint_app() {
     let ui = AppWindow::new().expect("Failed to load UI");
@@ -14,10 +16,9 @@ fn create_slint_app() {
     let timer = slint::Timer::default();
     timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(2000), move || {
         let ui = ui_handle.unwrap();
-        unsafe {
-            ui.set_temperature(TEMPERATURE);
-            ui.set_humidity(HUMIDITY);    
-        }
+
+        ui.set_temperature(TEMPERATURE.load(Ordering::Relaxed));
+        ui.set_humidity(HUMIDITY.load(Ordering::Relaxed));    
     });
 
     ui.run().unwrap();
@@ -30,9 +31,9 @@ unsafe extern "C" fn dht_task(_: *mut core::ffi::c_void) {
     loop {
         match dht.read() {
             Ok((temperature, humidity)) => {
-                if temperature != TEMPERATURE || humidity != HUMIDITY {
-                    TEMPERATURE = temperature;
-                    HUMIDITY = humidity;
+                if temperature != TEMPERATURE.load(Ordering::Relaxed) || humidity != HUMIDITY.load(Ordering::Relaxed) {
+                    TEMPERATURE.store(temperature, Ordering::Relaxed);
+                    HUMIDITY.store(humidity, Ordering::Relaxed);
                     log::info!("Temperature: {:.2}°C, Humidity: {:.2}%", temperature, humidity);
                 }
             }
@@ -41,11 +42,8 @@ unsafe extern "C" fn dht_task(_: *mut core::ffi::c_void) {
             }
         }
 
-        unsafe {
-            esp_idf_svc::sys::vTaskDelay(2000 / 10);
-        }
+        esp_idf_svc::sys::vTaskDelay(2000 / 10);
     }
-
 }
 
 fn main() {

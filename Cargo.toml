@@ -28,6 +28,7 @@ num-traits = { version = "0.2.16", default-features = false, features = ["libm"]
 log = { version = "0.4", default-features = false }
 esp-idf-svc = { version = "0.48", default-features = false }
 slint = { version = "1.6.0", default-features = false, features = ["compat-1-2", "unsafe-single-threaded", "libm", "renderer-software"] }
+portable-atomic = { version = "1", features = ["float"] }
 
 [build-dependencies]
 embuild = "0.31.3"
