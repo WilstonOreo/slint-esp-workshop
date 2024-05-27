@@ -147,7 +147,7 @@ impl slint::platform::Platform for EspPlatform {
                 // Draw the scene if something needs to be drawn.
                 self.window.draw_if_needed(|renderer| {
                     // Do the rendering!
-                    let region = renderer.render(&mut buffer, Self::DISPLAY_WIDTH as usize);
+                    let region = renderer.render(&mut buffer, Self::DISPLAY_WIDTH);
 
                     // Iterate each region to be updated
                     for (o, s) in region.iter() {

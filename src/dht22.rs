@@ -130,10 +130,9 @@ impl DHT22 {
         // Checksum is the sum of Data 8 bits masked out 0xFF
 
         if dht_data[4] == ((dht_data[0] + dht_data[1] + dht_data[2] + dht_data[3]) & 0xFF) {
-
-            return Ok((temperature, humidity));
+            Ok((temperature, humidity))
         } else {
-            return Err(DHT22Error::ChecksumError);
+            Err(DHT22Error::ChecksumError)
         }
     }
 }
