@@ -4,6 +4,7 @@ pub struct EspPlatform {
     panel_handle: esp_idf_svc::hal::sys::esp_lcd_panel_handle_t,
     touch_handle: Option<*mut esp_idf_svc::hal::sys::esp_lcd_touch_s>,
     window: alloc::rc::Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
+    timer: esp_idf_svc::timer::EspTimerService<esp_idf_svc::timer::Task>,
 }
 
 impl EspPlatform {
@@ -51,6 +52,7 @@ impl EspPlatform {
             panel_handle,
             touch_handle: Some(touch_handle),
             window,
+            timer: esp_idf_svc::timer::EspTimerService::new().unwrap(),
         })
     }
 }
@@ -64,10 +66,7 @@ impl slint::platform::Platform for EspPlatform {
         Ok(self.window.clone())
     }
     fn duration_since_start(&self) -> core::time::Duration {
-        unsafe {
-            let ticks = esp_idf_svc::hal::sys::xTaskGetTickCount(); // One tick is 10ms, according to sdkconfig.defaults
-            core::time::Duration::from_millis(ticks as u64 * 10)
-        }
+        self.timer.now()
     }
     fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
         use esp_idf_svc::hal::sys::*;
