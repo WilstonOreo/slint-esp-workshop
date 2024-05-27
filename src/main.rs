@@ -9,21 +9,6 @@ slint::include_modules!();
 static TEMPERATURE: portable_atomic::AtomicF32 = portable_atomic::AtomicF32::new(0.0);
 static HUMIDITY: portable_atomic::AtomicF32 = portable_atomic::AtomicF32::new(0.0);
 
-fn create_slint_app() {
-    let ui = AppWindow::new().expect("Failed to load UI");
-
-    let ui_handle = ui.as_weak();
-    let timer = slint::Timer::default();
-    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(2000), move || {
-        let ui = ui_handle.unwrap();
-
-        ui.set_temperature(TEMPERATURE.load(Ordering::Relaxed));
-        ui.set_humidity(HUMIDITY.load(Ordering::Relaxed));    
-    });
-
-    ui.run().unwrap();
-}
-
 unsafe extern "C" fn dht_task(_: *mut core::ffi::c_void) {
     //let dht = slint::platform::dht::Dht::new(4).unwrap();
     let dht = dht22::DHT22::new(13);
@@ -72,5 +57,16 @@ fn main() {
     }
 
     // Finally, run the app!
-    create_slint_app();
+    let ui = AppWindow::new().expect("Failed to load UI");
+
+    let ui_handle = ui.as_weak();
+    let timer = slint::Timer::default();
+    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(2000), move || {
+        let ui = ui_handle.unwrap();
+
+        ui.set_temperature(TEMPERATURE.load(Ordering::Relaxed));
+        ui.set_humidity(HUMIDITY.load(Ordering::Relaxed));    
+    });
+
+    ui.run().unwrap();
 }
