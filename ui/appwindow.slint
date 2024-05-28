@@ -1,4 +1,4 @@
-import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox, ListView, TabWidget } from "std-widgets.slint";
 
 import { StatusBar, TitleBar, MyStyleMetrics, BarIndicator } from "widgets.slint";
 
@@ -43,22 +43,45 @@ export component AppWindow inherits Window {
         TitleBar {
             text: "Slint Weather Station";
         }
+        TabWidget {
+            Tab {
+                title: "Weather";
+                HorizontalBox {
+                    TemperatureBar {
+                        value: ViewModel.weather.temperature;
+                        has-value: ViewModel.have-data;
+                    }
+                    HumidityBar {
+                        value: ViewModel.weather.humidity;
+                        has-value: ViewModel.have-data;
+                    }
+                }
 
-        Rectangle { 
-            width: parent.width;
-            
-            HorizontalBox {
-                TemperatureBar {
-                    value: ViewModel.weather.temperature;
-                }
-                HumidityBar {
-                    value: ViewModel.weather.humidity;
-                }
+            }
+
+            Tab {
+                title: "Records";
+                Flickable {
+                    VerticalLayout {
+                    for record in ViewModel.records : Rectangle {
+                        HorizontalBox {
+                            Text {
+                                text: record.timestamp;
+                            }
+                            Text {
+                                text: Math.round(record.temperature) + "°C";
+                            }
+                            Text {
+                                text: Math.round(record.humidity) + "%";
+                            }
+                        }
+                    }}
+                }        
             }
         }
 
         StatusBar {
-            text: ViewModel.weather.timestamp;
+            text: ViewModel.records[ViewModel.records.length - 1].timestamp;
         }
     }
 }

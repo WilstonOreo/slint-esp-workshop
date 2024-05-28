@@ -6,6 +6,8 @@ slint::include_modules!();
 
 use core::sync::atomic::Ordering;
 
+use slint::Model;
+
 static TEMPERATURE: portable_atomic::AtomicF32 = portable_atomic::AtomicF32::new(0.0);
 static HUMIDITY: portable_atomic::AtomicF32 = portable_atomic::AtomicF32::new(0.0);
 static TIMESTAMP: portable_atomic::AtomicI64 = portable_atomic::AtomicI64::new(0);
@@ -65,6 +67,19 @@ fn main() {
     // Finally, run the app!
     let ui = AppWindow::new().expect("Failed to load UI");
 
+    use slint::{VecModel, ModelRc};
+    use std::rc::Rc;
+    let records: Rc<VecModel<WeatherRecord>> = Rc::default();
+    records.push(WeatherRecord {
+        temperature: 20.0,
+        humidity: 50.0,
+        timestamp: "now".into()
+    });
+    let reversed_records = ModelRc::new(records.clone().reverse());
+
+    let records_rc = ModelRc::from(reversed_records.clone());
+    ui.global::<ViewModel>().set_records(reversed_records);
+
     let ui_handle = ui.as_weak();
 
     let timer = slint::Timer::default();
@@ -76,13 +91,17 @@ fn main() {
             return;
         }
 
-        ui.global::<ViewModel>().set_weather(WeatherRecord {
+        let weather = WeatherRecord {
             temperature: TEMPERATURE.load(Ordering::Relaxed),
             humidity: HUMIDITY.load(Ordering::Relaxed),
             // Convert the i64 timestamp in microseconds to slint::SharedString in seconds
             timestamp: slint::format!("{:?}s", TIMESTAMP.load(Ordering::Relaxed) / 1_000_000)
-        });
+        };
 
+        ui.global::<ViewModel>().set_weather(weather.clone());
+
+        records.push(weather);
+        
         ui.global::<ViewModel>().set_have_data(true);
         HAVE_DATA.store(false, Ordering::Relaxed);
     });
