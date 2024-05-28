@@ -1,17 +1,64 @@
-import { Button, VerticalBox } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+import { StatusBar, TitleBar, MyStyleMetrics, BarIndicator } from "widgets.slint";
+
+struct WeatherRecord {
+    temperature: float, // Temperature in degrees Celsius
+    humidity: float, // Temperature in percent
+    timestamp: string,
+}
+
+export global ViewModel {
+    in property <bool> have-data;
+    in property <WeatherRecord> weather;
+    in property <[WeatherRecord]> records;
+}
+
+component TemperatureBar inherits BarIndicator {
+    value: 0;
+    min-value: -20;
+    max-value: 50;
+    unit: "°C";
+    background: #FF0000.mix(#0000FF, root.level);
+}
+
+component HumidityBar inherits BarIndicator {
+    value: 50;
+    min-value: 0;
+    max-value: 100;
+    unit: "%";
+    background: #0000FF;
+}
 
 export component AppWindow inherits Window {
     in-out property<int> counter: 42;
     callback request-increase-value();
-    VerticalBox {
-        Text {
-            text: "Counter: \{root.counter}";
+    width: 320px;
+    height: 240px;
+
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+
+        TitleBar {
+            text: "Slint Weather Station";
         }
-        Button {
-            text: "Increase value";
-            clicked => {
-                root.request-increase-value();
+
+        Rectangle { 
+            width: parent.width;
+            
+            HorizontalBox {
+                TemperatureBar {
+                    value: ViewModel.weather.temperature;
+                }
+                HumidityBar {
+                    value: ViewModel.weather.humidity;
+                }
             }
+        }
+
+        StatusBar {
+            text: ViewModel.weather.timestamp;
         }
     }
 }
