@@ -1,4 +1,4 @@
-import { Button, VerticalBox, HorizontalBox, ListView, TabWidget } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox, ListView, TabWidget, Slider } from "std-widgets.slint";
 
 import { StatusBar, TitleBar, MyStyleMetrics, BarIndicator } from "widgets.slint";
 
@@ -32,7 +32,7 @@ component HumidityBar inherits BarIndicator {
 
 export component AppWindow inherits Window {
     in-out property<int> counter: 42;
-    callback request-increase-value();
+    callback slider-change(int);
     width: 320px;
     height: 240px;
 
@@ -44,6 +44,13 @@ export component AppWindow inherits Window {
             text: "Slint Weather Station";
         }
         TabWidget {
+            Tab {
+                Slider {
+                    changed => { root.slider-change(Math.round(self.value)); }
+                    width: 240px;
+                    height: 32px;
+                }
+            }
             Tab {
                 title: "Weather";
                 HorizontalBox {

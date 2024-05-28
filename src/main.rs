@@ -82,6 +82,10 @@ fn main() {
 
     let ui_handle = ui.as_weak();
 
+    ui.on_slider_change(move |x|{
+        log::info!("Slider change: {x}");
+    });
+
     let timer = slint::Timer::default();
     timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(2000), move || {
         // TODO: Update UI with sensor values
