@@ -1,43 +1,32 @@
-import { Palette } from "std-widgets.slint";
 
-export global AppStyleMetrics {
-    out property <length> padding: 9px;
-
-    out property <length> title-height: 30px;
-    out property <length> status-height: 24px;
-
-    out property <length> indicator-bar-width: 40px;
-}
+import { Palette, StyleMetrics } from "theme.slint";
 
 export component TitleBar inherits Rectangle {
     in property <string> text <=> text.text;
 
     width: 100%;
-    height: AppStyleMetrics.title-height;
-    padding-top: AppStyleMetrics.padding;
-    padding-bottom: AppStyleMetrics.padding;
-    background: #cccccc;
+    height: StyleMetrics.title-height;
+    padding-top: StyleMetrics.padding;
+    padding-bottom: StyleMetrics.padding;
+    background: Palette.background;
 
     text := Text {
         font-size: 16px;
-        text: "Itse me, titlebar.";
     }
 }
 
 export component StatusBar inherits Rectangle {
     in property <string> text <=> text.text;
 
-    height: AppStyleMetrics.status-height;
-    padding-top: AppStyleMetrics.padding;
-    padding-bottom: AppStyleMetrics.padding;
+    height: StyleMetrics.status-height;
+    padding-top: StyleMetrics.padding;
+    padding-bottom: StyleMetrics.padding;
     background: Palette.alternate-background;
 
     text := Text {
         width: parent.width;
         horizontal-alignment: center;
         vertical-alignment: center;
-
-        text: "Itse me, statusbar";
     }
 }
 
@@ -61,7 +50,7 @@ export component Indicator {
     fill := Rectangle {
         x: 0;
         y: parent.height - self.height;
-        width: AppStyleMetrics.indicator-bar-width;
+        width: StyleMetrics.indicator-bar-width;
         // Our root is also our parent right now.
         height: root.height * root.level;
         background: Colors.red;
@@ -70,25 +59,25 @@ export component Indicator {
     bar := Rectangle {
         x: 0;
         border-width: 2px;
-        width: AppStyleMetrics.indicator-bar-width;
+        width: StyleMetrics.indicator-bar-width;
         height: parent.height;
     }
 
     value-text := Text {
         text: "" + root.value.round() + " " + root.unit;
         font-size: 32px;
-        x: AppStyleMetrics.indicator-bar-width + AppStyleMetrics.padding;
+        x: StyleMetrics.indicator-bar-width + StyleMetrics.padding;
     }
 
     min-text := Text {
         text: "" + Math.round(root.min-value);
-        x: AppStyleMetrics.indicator-bar-width + AppStyleMetrics.padding;
+        x: StyleMetrics.indicator-bar-width + StyleMetrics.padding;
         y: parent.height - self.height;
     }
 
     max-text := Text {
         text: "" + root.max-value.round();
-        x: AppStyleMetrics.indicator-bar-width + AppStyleMetrics.padding;
+        x: StyleMetrics.indicator-bar-width + StyleMetrics.padding;
         y: 0;
     }
 

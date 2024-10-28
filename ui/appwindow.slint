@@ -1,10 +1,10 @@
-
-import { Button, VerticalBox, HorizontalBox, TabWidget, Slider } from "std-widgets.slint";
+import { TabWidget } from "std-widgets.slint";
 
 import { ViewModel } from "logic.slint";
 
-import { StatusBar, TitleBar, TemperatureBar, HumidityBar } from "widgets.slint";
+import { StatusBar, TitleBar } from "widgets.slint";
 
+import { TemperaturePage, ForecastPage, RecordingPage } from "pages.slint";
 
 export component AppWindow inherits Window {
     VerticalLayout {
@@ -13,17 +13,26 @@ export component AppWindow inherits Window {
         }
         TabWidget {
             Tab {
-                Rectangle {
-                    background: #ffffff;
+                title: "Temperature";
 
-                    HorizontalBox {
-                        TemperatureBar {
-                            value: ViewModel.current.temperature-celsius;
-                        }
-                        HumidityBar {
-                            value: ViewModel.current.humidity-percent;
-                        }
-                    }
+                TemperaturePage {
+
+                }
+            }
+
+            Tab {
+                title: "Forecast";
+
+                ForecastPage {
+
+                }
+            }
+
+            Tab {
+                title: "Recording";
+
+                RecordingPage {
+
                 }
             }
         }

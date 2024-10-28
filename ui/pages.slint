@@ -1,0 +1,28 @@
+
+import { Button, VerticalBox, HorizontalBox, TabWidget, Slider } from "std-widgets.slint";
+
+import { ViewModel } from "logic.slint";
+
+import { StatusBar, TitleBar, TemperatureBar, HumidityBar } from "widgets.slint";
+
+component Page inherits Rectangle {
+    background: #ffffff;
+}
+
+export component TemperaturePage inherits Page {
+    HorizontalBox {
+        TemperatureBar {
+            value: ViewModel.current.temperature-celsius;
+        }
+        HumidityBar {
+            value: ViewModel.current.humidity-percent;
+        }
+    }
+}
+
+export component ForecastPage inherits Page {
+
+}
+
+export component RecordingPage inherits Page {
+}
