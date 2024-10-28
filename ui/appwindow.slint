@@ -1,17 +1,76 @@
-import { Button, VerticalBox } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox, TabWidget, Slider } from "std-widgets.slint";
+import { Indicator, TitleBar, StatusBar, AppStyleMetrics } from "widgets.slint";
+
+// @rust-attr(derive(Debug))
+struct WeatherRecord {
+    temperature_celsius: float,
+    humidity_percent: float,
+    timestamp: string,
+}
+
+export global ViewModel {
+    in property <bool> have-data;
+    in property <WeatherRecord> current;
+    in property <[WeatherRecord]> records;
+}
+
+component TemperatureBar inherits Indicator {
+    value: 20;
+    min-value: -20;
+    max-value: 50;
+    unit: "°C";
+    background: #ff0000.mix(#0000ff, root.level);
+}
+
+component HumidityBar inherits Indicator {
+    value: 55;
+    min-value: 0;
+    max-value: 100;
+    unit: "%";
+    background: #0000ff;
+}
 
 export component AppWindow inherits Window {
     in-out property<int> counter: 42;
-    callback request-increase-value();
-    VerticalBox {
-        Text {
-            text: "Counter: \{root.counter}";
+    callback slider-changed(float);
+
+    width: 320px;
+    height: 240px;
+
+    VerticalLayout {
+        TitleBar {
+            text: "Slint Weather Station";
         }
-        Button {
-            text: "Increase value";
-            clicked => {
-                root.request-increase-value();
+        TabWidget {
+            Tab {
+                Rectangle {
+                    background: #ffffff;
+
+                    HorizontalBox {
+                        TemperatureBar {
+                            value: ViewModel.current.temperature-celsius;
+                        }
+                        HumidityBar {
+                            value: ViewModel.current.humidity-percent;
+                        }
+                    }
+                }
             }
+            // Looks like the current styling of the tab layout supports only two tabs.
+            // Tab {
+            //     Text {
+            //         text: "foo";
+            //     }
+            // }
+            Tab {
+                Slider {
+                    width: 200px;
+                    changed => { root.slider-changed(self.value); }
+                }
+            }
+        }
+        StatusBar {
+            text: ViewModel.current.timestamp;
         }
     }
 }

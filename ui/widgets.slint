@@ -1,0 +1,107 @@
+import { Palette } from "std-widgets.slint";
+
+export global AppStyleMetrics {
+    out property <length> padding: 9px;
+
+    out property <length> title-height: 30px;
+    out property <length> status-height: 24px;
+
+    out property <length> indicator-bar-width: 40px;
+}
+
+export component TitleBar inherits Rectangle {
+    in property <string> text <=> text.text;
+
+    width: 100%;
+    height: AppStyleMetrics.title-height;
+    padding-top: AppStyleMetrics.padding;
+    padding-bottom: AppStyleMetrics.padding;
+    background: #cccccc;
+
+    text := Text {
+        font-size: 16px;
+        text: "Itse me, titlebar.";
+    }
+}
+
+export component StatusBar inherits Rectangle {
+    in property <string> text <=> text.text;
+
+    height: AppStyleMetrics.status-height;
+    padding-top: AppStyleMetrics.padding;
+    padding-bottom: AppStyleMetrics.padding;
+    background: Palette.alternate-background;
+
+    text := Text {
+        width: parent.width;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+
+        text: "Itse me, statusbar";
+    }
+}
+
+export component Indicator {
+    in property <float> value: 40;
+    in property <float> min-value: 0;
+    in property <float> max-value: 100;
+    in property <string> unit: "°C";
+    in property <brush> background <=> fill.background;
+    in property <bool> has-value: true;
+
+    // Ensure displayed level stays within min and max.
+    out property <float> level: (Math.clamp(self.value, self.min-value, self.max-value) - self.min-value) / (self.max-value - self.min-value);
+    
+    animate level {
+        duration: 1000ms;
+    }
+
+    // Right now, fill and bar are on top of each other. But they could also be nested.
+
+    fill := Rectangle {
+        x: 0;
+        y: parent.height - self.height;
+        width: AppStyleMetrics.indicator-bar-width;
+        // Our root is also our parent right now.
+        height: root.height * root.level;
+        background: Colors.red;
+    }
+
+    bar := Rectangle {
+        x: 0;
+        border-width: 2px;
+        width: AppStyleMetrics.indicator-bar-width;
+        height: parent.height;
+    }
+
+    value-text := Text {
+        text: "" + Math.round(root.value) + " " + root.unit;
+        font-size: 32px;
+        x: AppStyleMetrics.indicator-bar-width + AppStyleMetrics.padding;
+    }
+
+    min-text := Text {
+        text: "" + Math.round(root.min-value);
+        x: AppStyleMetrics.indicator-bar-width + AppStyleMetrics.padding;
+        y: parent.height - self.height;
+    }
+
+    max-text := Text {
+        text: "" + Math.round(root.max-value);
+        x: AppStyleMetrics.indicator-bar-width + AppStyleMetrics.padding;
+        y: 0;
+    }
+
+    states [
+        value when root.has-value: {
+            value-text.visible: true;
+            fill.visible: true;
+            bar.border-color: Palette.foreground;
+        }
+        no-value when !root.has-value: {
+            value-text.visible: false;
+            fill.visible: false;
+            bar.border-color: Palette.alternate-background;
+        }
+    ]
+}
