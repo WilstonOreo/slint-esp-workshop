@@ -81,8 +81,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 #### 3. Install packages required for Rust ESP toolchain
 
 ```sh
-sudo apt install gcc g++ libssl-dev pkg-config libudev-dev make python3.12-venv
-sudo apt install git wget flex bison gperf python3 python3-pip python3-venv cmake ninja-build ccache libffi-dev dfu-util libusb-1.0-0 usbutils
+sudo apt install gcc g++ libssl-dev pkg-config libudev-dev make flex bison gperf cmake ccache ninja-build 
+sudo apt install git wget libxkbcommon-x11-dev python3 python3-pip python3-venv python3.12-venv libffi-dev dfu-util libusb-1.0-0 usbutils
 ```
 
 #### 4. Install cargo dependencies

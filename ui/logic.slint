@@ -1,0 +1,13 @@
+// @rust-attr(derive(Debug))
+struct WeatherRecord {
+    temperature_celsius: float,
+    humidity_percent: float,
+    timestamp: string,
+}
+
+export global ViewModel {
+    in property <bool> have-data;
+    in property <WeatherRecord> current;
+    in property <[WeatherRecord]> records;
+}
+

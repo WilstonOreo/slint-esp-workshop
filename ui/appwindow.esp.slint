@@ -1,12 +1,15 @@
-
 import { Button, VerticalBox, HorizontalBox, TabWidget, Slider } from "std-widgets.slint";
+import { Indicator, TitleBar, StatusBar, AppStyleMetrics, HumidityBar, TemperatureBar } from "widgets.slint";
 
-import { ViewModel } from "logic.slint";
-
-import { StatusBar, TitleBar, TemperatureBar, HumidityBar } from "widgets.slint";
-
+import { * } from "logic.slint";
 
 export component AppWindow inherits Window {
+    in-out property<int> counter: 42;
+    callback slider-changed(float);
+
+    width: 320px;
+    height: 240px;
+
     VerticalLayout {
         TitleBar {
             text: "Slint Weather Station";
@@ -24,6 +27,12 @@ export component AppWindow inherits Window {
                             value: ViewModel.current.humidity-percent;
                         }
                     }
+                }
+            }
+            Tab {
+                Slider {
+                    width: 200px;
+                    changed => { root.slider-changed(self.value); }
                 }
             }
         }

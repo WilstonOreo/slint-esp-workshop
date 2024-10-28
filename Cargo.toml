@@ -1,7 +1,6 @@
 [workspace]
 members = [
-    #    "winit"
-    #"esp32",
+    "winit",
     #    "wasm"
     #    "android"
 ]

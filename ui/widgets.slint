@@ -75,7 +75,7 @@ export component Indicator {
     }
 
     value-text := Text {
-        text: "" + Math.round(root.value) + " " + root.unit;
+        text: "" + root.value.round() + " " + root.unit;
         font-size: 32px;
         x: AppStyleMetrics.indicator-bar-width + AppStyleMetrics.padding;
     }
@@ -87,7 +87,7 @@ export component Indicator {
     }
 
     max-text := Text {
-        text: "" + Math.round(root.max-value);
+        text: "" + root.max-value.round();
         x: AppStyleMetrics.indicator-bar-width + AppStyleMetrics.padding;
         y: 0;
     }
@@ -104,4 +104,21 @@ export component Indicator {
             bar.border-color: Palette.alternate-background;
         }
     ]
+}
+
+
+export component TemperatureBar inherits Indicator {
+    value: 20;
+    min-value: -20;
+    max-value: 50;
+    unit: "°C";
+    background: #ff0000.mix(#0000ff, root.level);
+}
+
+export component HumidityBar inherits Indicator {
+    value: 55;
+    min-value: 0;
+    max-value: 100;
+    unit: "%";
+    background: #0000ff;
 }
