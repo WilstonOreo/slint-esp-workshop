@@ -85,9 +85,9 @@ fn main() {
     let ui = AppWindow::new().expect("Failed to load UI");
     let ui_handle = ui.as_weak();
 
-    ui.on_slider_changed(|value| {
+    /*ui.on_slider_changed(|value| {
         log::info!("slider changed to {}", value);
-    });
+    });*/
 
     let timer = slint::Timer::default();
     timer.start(

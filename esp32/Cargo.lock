@@ -2942,6 +2942,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "slint-workshop-common"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "slint-workshop-esp"
 version = "0.2.0"
 dependencies = [
@@ -2952,6 +2960,7 @@ dependencies = [
  "portable-atomic",
  "slint",
  "slint-build",
+ "slint-workshop-common",
 ]
 
 [[package]]

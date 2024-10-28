@@ -41,6 +41,8 @@ slint = { version = "1.8", default-features = false, features = [
 ] }
 portable-atomic = { version = "1", features = ["float"] }
 
+slint-workshop-common = { path = "../common" }
+
 [build-dependencies]
 embuild = "0.32"
 slint-build = "1.8"
