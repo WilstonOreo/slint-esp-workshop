@@ -1,10 +1,10 @@
 [package]
 name = "slint-esp-workshop"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Michael Winkelmann <michael@winkelmann.site>"]
 edition = "2021"
 resolver = "2"
-rust-version = "1.71"
+rust-version = "1.80"
 
 [profile.release]
 opt-level = "s"
@@ -26,13 +26,13 @@ embassy = ["esp-idf-svc/embassy-sync", "esp-idf-svc/critical-section", "esp-idf-
 [dependencies]
 num-traits = { version = "0.2.16", default-features = false, features = ["libm"], optional = true }
 log = { version = "0.4", default-features = false }
-esp-idf-svc = { version = "0.48", default-features = false }
-slint = { version = "1.6.0", default-features = false, features = ["compat-1-2", "unsafe-single-threaded", "libm", "renderer-software"] }
+esp-idf-svc = { version = "0.49", default-features = false }
+slint = { version = "1.8.0", default-features = false, features = ["compat-1-2", "unsafe-single-threaded", "libm", "renderer-software"] }
 portable-atomic = { version = "1", features = ["float"] }
 
 [build-dependencies]
-embuild = "0.31.3"
-slint-build = "1.6.0"
+embuild = "0.32"
+slint-build = "1.8.0"
 
 [[package.metadata.esp-idf-sys.extra_components]]
 remote_component = { name = "espressif/esp-box-3", version = "1.1.3" }
