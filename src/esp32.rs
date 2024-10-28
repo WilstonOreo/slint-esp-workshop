@@ -128,7 +128,6 @@ impl slint::platform::Platform for EspPlatform {
                                     button: slint::platform::PointerEventButton::Left,
                                 },
                             );
-                            log::info!("Touchpad pressed: {:?}", last_position);
                         }
 
                         touch_down = true;
