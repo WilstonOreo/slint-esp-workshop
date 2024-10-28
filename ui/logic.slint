@@ -5,8 +5,15 @@ struct WeatherRecord {
     timestamp: string,
 }
 
+export enum SensorStatus {
+    Ok,
+    NoData,
+    Error,
+}
+
+
 export global ViewModel {
-    in property <bool> have-data;
+    in property <SensorStatus> sensor-status;
     in property <WeatherRecord> current;
     in property <[WeatherRecord]> records;
 }
