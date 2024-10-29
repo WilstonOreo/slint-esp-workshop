@@ -86,8 +86,8 @@ fn main() -> anyhow::Result<()> {
     let ui = AppWindow::new().expect("Failed to load UI");
     let ui_handle = ui.as_weak();
 
-    ui.on_slider_changed(|value| {
-        log::info!("slider changed to {}", value);
+    ui.on_screen_brightness_slider_changed(|value| {
+        esp32::set_brightness(value);
     });
 
     let timer = slint::Timer::default();

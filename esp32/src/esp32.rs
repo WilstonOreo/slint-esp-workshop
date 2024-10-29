@@ -186,3 +186,14 @@ impl slint::platform::Platform for EspPlatform {
         }
     }
 }
+
+/// Set the brightness of the display
+pub fn set_brightness(brightness: f32) {
+    unsafe {
+        use esp_idf_svc::hal::sys::*;
+        let brightness = brightness as i32;
+        log::info!("Setting brightness to {}", brightness);
+        bsp_display_brightness_set(brightness);
+    }
+}
+

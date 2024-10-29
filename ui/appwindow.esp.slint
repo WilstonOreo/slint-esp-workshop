@@ -4,12 +4,14 @@ import { ViewModel } from "logic.slint";
 
 import { StatusBar, TitleBar } from "widgets.slint";
 
-import { TemperaturePage, ForecastPage, RecordingPage } from "pages.slint";
+import { TemperaturePage, ScreenBrightnessPage, RecordingPage } from "pages.slint";
 
 export { ViewModel }
 
 
 export component AppWindow inherits Window {
+    callback screen-brightness-slider-changed <=> screen-brightness-page.screen-brightness-changed;
+
     VerticalLayout {
         TitleBar {
             text: "Slint Weather Station";
@@ -24,10 +26,9 @@ export component AppWindow inherits Window {
             }
 
             Tab {
-                title: "Forecast";
+                title: "Brightness";
 
-                ForecastPage {
-
+                screen-brightness-page := ScreenBrightnessPage {
                 }
             }
 

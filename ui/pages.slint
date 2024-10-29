@@ -26,3 +26,19 @@ export component ForecastPage inherits Page {
 
 export component RecordingPage inherits Page {
 }
+
+export component ScreenBrightnessPage inherits Page {
+    property screen-brightness <=> slider.value;
+    callback screen-brightness-changed(float);
+    
+    padding: 4px;
+
+    slider := Slider {
+        width: parent.width * 80%;
+        height: parent.height;
+
+        minimum: 10; // Minimum brightness is 10%, to avoid black screen.
+        maximum: 100;
+        changed => { root.screen-brightness-changed(self.value); }
+    }
+}
