@@ -125,11 +125,16 @@ If everything is correctly connected and installed, a list of the  something sim
 ```
 
 The id `2-9` on the left is the bus number. It might be different on your machine.
-Now, bind and attach the bus to WSL:
+First, bind the bus to the usbipd service:
 
 ```ps1
 usbipd bind --busid 2-9 # This only has to be done once
-usbipd attach --wsl --busid 2-9 # This has to be done for each WSL session
+```
+
+After that, attach the bus to WSL:
+
+```ps1
+usbipd attach --wsl --busid 2-9 # This has to be done for each WSL session and each time the device is disconnected
 ```
 
 In your WSL shell, test with `lusb` if you can see the ESP32 in the list.
