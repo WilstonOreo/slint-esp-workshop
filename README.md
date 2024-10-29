@@ -140,12 +140,3 @@ Bus 001 Device 003: ID 303a:1001 Espressif USB JTAG/serial debug unit
 ```
 
 Now, your device can be flashed and you can run your application via `cargo run`.
-
-## Wifi Configuration
-
-Set the following environment variables to configure the WiFi:
-
-```sh
-export WIFI_SSID=SlintWorkshop
-export WIFI_PASS=slintworkshop
-```
