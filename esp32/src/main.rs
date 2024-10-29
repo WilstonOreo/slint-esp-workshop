@@ -1,64 +1,62 @@
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use slint_workshop_common::ValueStore;
 
 mod dht22;
 mod esp32;
 
 slint::include_modules!();
 
-
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct SensorData {
     temperature_celsius: f32,
     humidity_percent: f32,
     when: std::time::Duration,
+    status: SensorStatus,
 }
 
-/// Convenience helper for passing the last of a value between threads. For example from a thread
-/// interfacing with a sensor to another one processing the data.
-#[derive(Clone, Default)]
-struct ValueStore<T>(Arc<Mutex<Option<T>>>);
-
-impl<T: Clone> ValueStore<T> {
-    /// Sets `value` as the last value.
-    ///
-    /// # Panics
-    ///
-    /// If the locking the interally used mutex fails.
-    fn set(&self, value: T) {
-        let mut data = self.0.lock().unwrap();
-        let _ = data.insert(value);
-    }
-
-    /// Gets the stored value.
-    ///
-    /// # Panics
-    ///
-    /// If the locking of the mutex fails
-    fn get(&self) -> Option<T> {
-        let mut data = self.0.lock().unwrap();
-        data.take()
+impl From<SensorData> for WeatherRecord {
+    fn from(data: SensorData) -> Self {
+        WeatherRecord {
+            temperature_celsius: data.temperature_celsius,
+            humidity_percent: data.humidity_percent,
+            timestamp: slint::SharedString::from(data.when.as_secs().to_string()),
+        }
     }
 }
+
 
 fn dht_task(last: ValueStore<SensorData>) {
     let start = Instant::now();
-    let dht = dht22::DHT22::new(13);
+    let pin = 13;
+    let dht = dht22::DHT22::new(pin);
+
+    let mut error_count = 0;
+    let max_errors = 5;
 
     loop {
         match dht.read() {
-            #[allow(unused_variables)]
-            Ok((temperature, humidity)) => {
-                let data = SensorData {
-                    temperature_celsius: temperature,
-                    humidity_percent: humidity,
+            Ok((temperature_celsius, humidity_percent)) => {
+                last.set(SensorData {
+                    temperature_celsius,
+                    humidity_percent,
                     when: Instant::now().duration_since(start),
-                };
-
-                last.set(data);
+                    status: SensorStatus::Ok,
+                });
+                error_count = 0;
             }
-            Err(e) => {
-                log::error!("Error reading DHT22: {:?}", e);
+            Err(e) => {                
+                error_count += 1;
+
+                if error_count >= max_errors {
+                    log::error!("Error reading DHT22: {:?}", e);
+
+                    last.set(SensorData {
+                        temperature_celsius: 0.0,
+                        humidity_percent: 0.0,
+                        when: Instant::now().duration_since(start),
+                        status: SensorStatus::Error,
+                    });
+                }
             }
         }
 
@@ -77,18 +75,14 @@ fn main() -> anyhow::Result<()> {
     // Set the platform
     slint::platform::set_platform(esp32::EspPlatform::new()).unwrap();
 
-
+    // Launch the DHT task in a separate thread
     let last_sensor_data = ValueStore::<SensorData>::default();
     let last_for_dht_task = last_sensor_data.clone();
-    std::thread::spawn(move || dht_task(last_for_dht_task));
+    std::thread::spawn(move || dht_task(last_sensor_data));
 
     // Finally, run the app!
     let ui = AppWindow::new().expect("Failed to load UI");
     let ui_handle = ui.as_weak();
-
-    ui.on_screen_brightness_slider_changed(|value| {
-        esp32::set_brightness(value);
-    });
 
     let timer = slint::Timer::default();
     timer.start(
@@ -97,18 +91,22 @@ fn main() -> anyhow::Result<()> {
         move || {
             let ui = ui_handle.unwrap();
             let model = ViewModel::get(&ui);
-            if let Some(data) = last_sensor_data.get() {
-                let when = data.when.as_secs().to_string();
-                let record = WeatherRecord {
-                    temperature_celsius: data.temperature_celsius,
-                    humidity_percent: data.humidity_percent,
-                    timestamp: slint::SharedString::from(when),
-                };
-
-                model.set_current(record.clone());
+            match last_for_dht_task.get() {
+                None => {
+                    model.set_sensor_status(SensorStatus::Error);
+                }
+                Some(data) => {
+                    model.set_current(data.into());
+                    model.set_sensor_status(SensorStatus::Ok);
+                }
             }
         },
     );
+    
+    // Set the initial brightness
+    ui.on_screen_brightness_slider_changed(|value| {
+        esp32::set_brightness(value);
+    });
 
     ui.run().map_err(|e| anyhow::anyhow!(e))
 }

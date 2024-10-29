@@ -39,6 +39,7 @@ export component ScreenBrightnessPage inherits Page {
 
         minimum: 10; // Minimum brightness is 10%, to avoid black screen.
         maximum: 100;
+        value: 100;
         changed => { root.screen-brightness-changed(self.value); }
     }
 }
