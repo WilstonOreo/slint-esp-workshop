@@ -115,3 +115,16 @@ export component HumidityBar inherits Indicator {
     unit: "%";
     background: #0000ff;
 }
+
+export component AppWindow inherits Window {
+    in property status-bar-text <=> status-bar.text;
+
+    VerticalLayout {
+        TitleBar {
+            text: "Slint Weather Station";
+        }
+        @children
+
+        status-bar := StatusBar {}
+    }
+}
