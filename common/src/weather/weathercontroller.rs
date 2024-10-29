@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct CityData {
     pub lat: f64,
     pub lon: f64,
@@ -44,7 +44,7 @@ pub struct PrecipitationData {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
-pub struct DayWeatherData {
+pub struct WeatherData {
     pub condition: WeatherCondition,
     pub description: String,
 
@@ -56,32 +56,15 @@ pub struct DayWeatherData {
     pub uv_index: f64,
 }
 
+
+/* 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ForecastWeatherData {
     pub day_name: String,
-    pub weather_data: DayWeatherData,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct WeatherData {
-    pub current_data: DayWeatherData,
-    pub forecast_data: Vec<ForecastWeatherData>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct CityWeatherData {
-    pub city_data: CityData,
     pub weather_data: WeatherData,
 }
+    */
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct GeoLocationData {
-    pub name: String,
-    pub lat: f64,
-    pub lon: f64,
-    pub country: String,
-    pub state: Option<String>,
-}
 
 #[cfg(not(target_arch = "wasm32"))]
 pub type WeatherControllerPointer = Box<dyn WeatherController + Send>;
@@ -90,27 +73,16 @@ pub type WeatherControllerPointer = Box<dyn WeatherController + Send + 'static>;
 
 pub type WeatherControllerSharedPointer = Arc<Mutex<WeatherControllerPointer>>;
 
+
+/// The weather controller trait that provides the weather data.
 pub trait WeatherController {
-    fn load(&mut self) -> Result<(), Box<dyn std::error::Error>>;
-    fn save(&self) -> Result<(), Box<dyn std::error::Error>>;
+    /// Fetches the city data.
+    fn city_data(&self) -> Result<CityData, Box<dyn std::error::Error>>;
+    
+    /// Fetches the current weather data.
+    fn current_data(&self) -> Result<WeatherData, Box<dyn std::error::Error>>;
 
-    fn refresh_cities(&mut self) -> Result<Vec<CityWeatherData>, Box<dyn std::error::Error>>;
-
-    fn add_city(
-        &mut self,
-        city: CityData,
-    ) -> Result<Option<CityWeatherData>, Box<dyn std::error::Error>>;
-
-    fn reorder_cities(
-        &mut self,
-        index: usize,
-        new_index: usize,
-    ) -> Result<(), Box<dyn std::error::Error>>;
-
-    fn remove_city(&mut self, index: usize) -> Result<(), Box<dyn std::error::Error>>;
-
-    fn search_location(
-        &self,
-        query: String,
-    ) -> Result<Vec<GeoLocationData>, Box<dyn std::error::Error>>;
+    // Fetches the forecast weather data.
+    //fn forecast_data(&self) -> Result<Vec<ForecastWeatherData>, Box<dyn std::error::Error>>;
 }
+

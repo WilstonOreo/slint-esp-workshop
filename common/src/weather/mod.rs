@@ -4,8 +4,7 @@
 mod weathercontroller;
 mod dummyweathercontroller;
 
-pub use weathercontroller::WeatherControllerPointer;
-pub use weathercontroller::WeatherControllerSharedPointer;
+pub use weathercontroller::*;
 
 pub use dummyweathercontroller::DummyWeatherController;
 

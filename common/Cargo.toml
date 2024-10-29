@@ -13,8 +13,6 @@ chrono = { version = "0.4.38", optional = true, default-features = false, featur
     "clock",
 ] }
 
-tokio = { version = "1.37.0", optional = true }
-
 openweather_sdk = { version = "0.1.8", optional = true }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 directories = { version = "5", optional = true }
@@ -25,6 +23,5 @@ weather = [
     "dep:openweather_sdk",
     "dep:openssl",
     "dep:chrono",
-    "dep:tokio",
     "dep:directories",
 ]

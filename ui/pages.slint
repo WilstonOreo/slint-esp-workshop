@@ -1,5 +1,7 @@
 import { StatusBar, TitleBar, TemperatureBar, HumidityBar, Page, HorizontalBox, Slider } from "widgets.slint";
 
+import { WeatherRecord } from "datatypes.slint";
+
 export component TemperaturePage inherits Page {
     in property temperature-celsius <=> temperature-bar.value;
     in property has-temperature <=> temperature-bar.has-value;
@@ -12,12 +14,31 @@ export component TemperaturePage inherits Page {
     }
 }
 
-export component ForecastPage inherits Page {
-
-}
-
 export component RecordingPage inherits Page {
+    in property <[WeatherRecord]> records;
+
+    Flickable {
+        VerticalLayout {
+            for record in records : Rectangle {
+                HorizontalBox {
+                    Text {
+                        text: record.timestamp;
+                    }
+                    Text {
+                        text: Math.round(record.temperature_celsius) + "°C";
+                    }
+                    Text {
+                        text: Math.round(record.humidity_percent) + "%";
+                    }
+                }
+            }
+        }            
+    }
 }
+
+export component ForecastPage inherits Page {
+}
+
 
 export component ScreenBrightnessPage inherits Page {
     out property screen-brightness <=> slider.value;

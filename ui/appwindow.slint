@@ -1,15 +1,16 @@
 import { TabWidget } from "std-widgets.slint";
 
 import { AppWindow as Window } from "widgets.slint";
-import { TemperaturePage, ScreenBrightnessPage } from "pages.slint";
+import { ForecastPage, TemperaturePage, RecordingPage } from "pages.slint";
+
+import { WeatherRecord } from "datatypes.slint";
 
 export global ViewModel {
     in property <WeatherRecord> current;
-    in property <[WeatherRecord]> recording;
+    in property <[WeatherRecord]> records;
 }
 
 export component AppWindow inherits Window {
-    callback screen-brightness-slider-changed <=> screen-brightness-page.screen-brightness-changed;
     status-bar-text: ViewModel.current.timestamp;
 
     TabWidget {
@@ -20,9 +21,15 @@ export component AppWindow inherits Window {
         }
 
         Tab {
-            title: "Brightness";
+            title: "Recording";
 
-            screen-brightness-page := ScreenBrightnessPage {}
+            RecordingPage {}
+        }
+
+        Tab {
+            title: "Forecast";
+
+            ForecastPage {}
         }
     }
 }
