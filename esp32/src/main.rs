@@ -3,8 +3,6 @@ use std::time::{Duration, Instant};
 
 mod dht22;
 mod esp32;
-mod wifi;
-mod http;
 
 slint::include_modules!();
 
@@ -82,15 +80,15 @@ fn main() -> anyhow::Result<()> {
 
     let last_sensor_data = ValueStore::<SensorData>::default();
     let last_for_dht_task = last_sensor_data.clone();
-    //std::thread::spawn(move || dht_task(last_for_dht_task));
+    std::thread::spawn(move || dht_task(last_for_dht_task));
 
     // Finally, run the app!
     let ui = AppWindow::new().expect("Failed to load UI");
     let ui_handle = ui.as_weak();
 
-    /*ui.on_slider_changed(|value| {
+    ui.on_slider_changed(|value| {
         log::info!("slider changed to {}", value);
-    });*/
+    });
 
     let timer = slint::Timer::default();
     timer.start(
@@ -111,35 +109,6 @@ fn main() -> anyhow::Result<()> {
             }
         },
     );
-
-
-
-    use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
-    let peripherals = esp_idf_svc::hal::peripherals::Peripherals::take()?;
-    let sys_loop = EspSystemEventLoop::take()?;
-    let timer_service = esp_idf_svc::timer::EspTaskTimerService::new()?;
-    let nvs = EspDefaultNvsPartition::take()?;
-    
-    let mut wifi = esp_idf_svc::wifi::AsyncWifi::wrap(
-            esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs)).unwrap(),
-            sys_loop,
-            timer_service,
-        ).unwrap();
-
-    esp_idf_svc::hal::task::block_on(wifi::connect(&mut wifi))?;
-
-    let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
-
-    log::info!("Wifi DHCP info: {:?}", ip_info);
-
-
-    std::thread::spawn(move || {
-        let mut client = Box::new(http::new_client().unwrap());
-        loop {
-            let _ = http::get_request(&mut client);
-            std::thread::sleep(Duration::from_secs(5));
-        }
-    });
 
     ui.run().map_err(|e| anyhow::anyhow!(e))
 }
