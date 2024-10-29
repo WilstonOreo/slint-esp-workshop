@@ -11,7 +11,7 @@ slint::include_modules!();
 struct SensorData {
     temperature_celsius: f32,
     humidity_percent: f32,
-    when: Duration,
+    when: std::time::Duration,
 }
 
 /// Convenience helper for passing the last of a value between threads. For example from a thread
