@@ -2953,6 +2953,8 @@ dependencies = [
 name = "slint-workshop-esp"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
+ "embedded-svc",
  "embuild",
  "esp-idf-svc",
  "log",

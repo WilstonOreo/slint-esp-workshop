@@ -82,7 +82,7 @@ fn main() -> anyhow::Result<()> {
 
     let last_sensor_data = ValueStore::<SensorData>::default();
     let last_for_dht_task = last_sensor_data.clone();
-    std::thread::spawn(move || dht_task(last_for_dht_task));
+    //std::thread::spawn(move || dht_task(last_for_dht_task));
 
     // Finally, run the app!
     let ui = AppWindow::new().expect("Failed to load UI");
@@ -132,8 +132,14 @@ fn main() -> anyhow::Result<()> {
 
     log::info!("Wifi DHCP info: {:?}", ip_info);
 
-    let mut client = http::new_client()?;
-    http::get_request(&mut client)?;
+
+    std::thread::spawn(move || {
+        let mut client = Box::new(http::new_client().unwrap());
+        loop {
+            let _ = http::get_request(&mut client);
+            std::thread::sleep(Duration::from_secs(5));
+        }
+    });
 
     ui.run().map_err(|e| anyhow::anyhow!(e))
 }

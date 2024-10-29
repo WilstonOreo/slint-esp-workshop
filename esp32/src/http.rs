@@ -8,7 +8,7 @@ pub fn new_client() -> anyhow::Result<HttpClient<EspHttpConnection>> {
 }
 
 /// Send an HTTP GET request.
-pub fn get_request(client: &mut HttpClient<EspHttpConnection>) -> anyhow::Result<()> {
+pub async fn get_request(client: &mut HttpClient<EspHttpConnection>) -> anyhow::Result<()> {
     use log::{error, info};
     use embedded_svc::utils::io;
     

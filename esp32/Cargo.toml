@@ -28,6 +28,7 @@ embassy = [
 ]
 
 [dependencies]
+anyhow = "1"
 num-traits = { version = "0.2.16", default-features = false, features = [
     "libm",
 ], optional = true }
@@ -39,6 +40,9 @@ slint = { version = "1.8", default-features = false, features = [
     "libm",
     "renderer-software",
 ] }
+
+embedded-svc = { version = "0.28", default-features = false }
+
 portable-atomic = { version = "1", features = ["float"] }
 
 slint-workshop-common = { path = "../common" }
