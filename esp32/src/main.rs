@@ -3,6 +3,8 @@ use std::time::{Duration, Instant};
 
 mod dht22;
 mod esp32;
+mod wifi;
+//mod http;
 
 slint::include_modules!();
 
@@ -66,7 +68,7 @@ fn dht_task(last: ValueStore<SensorData>) {
     }
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
@@ -76,6 +78,7 @@ fn main() {
 
     // Set the platform
     slint::platform::set_platform(esp32::EspPlatform::new()).unwrap();
+
 
     let last_sensor_data = ValueStore::<SensorData>::default();
     let last_for_dht_task = last_sensor_data.clone();
@@ -109,5 +112,18 @@ fn main() {
         },
     );
 
-    ui.run().unwrap();
+
+
+    use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
+    let peripherals = esp_idf_svc::hal::peripherals::Peripherals::take()?;
+    let sys_loop = EspSystemEventLoop::take()?;
+    let nvs = EspDefaultNvsPartition::take()?;
+    
+    let mut wifi = esp_idf_svc::wifi::BlockingWifi::wrap(
+            esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs)).unwrap(),
+            sys_loop,
+        ).unwrap();
+    wifi::connect(&mut wifi).unwrap(); 
+
+    ui.run().map_err(|e| anyhow::anyhow!(e))
 }
