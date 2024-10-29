@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 mod dht22;
 mod esp32;
 mod wifi;
-//mod http;
+mod http;
 
 slint::include_modules!();
 
@@ -131,6 +131,9 @@ fn main() -> anyhow::Result<()> {
     let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
 
     log::info!("Wifi DHCP info: {:?}", ip_info);
+
+    let mut client = http::new_client()?;
+    http::get_request(&mut client)?;
 
     ui.run().map_err(|e| anyhow::anyhow!(e))
 }
