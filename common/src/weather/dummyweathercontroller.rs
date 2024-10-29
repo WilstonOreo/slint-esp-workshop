@@ -7,7 +7,7 @@ use crate::weather::weathercontroller::{
     CityData, WeatherData, WeatherController,
 };
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize)]
 pub struct DummyWeatherController {
     city_data: CityData,
     weather_data: WeatherData,
@@ -20,6 +20,7 @@ impl DummyWeatherController {
         serde_json::from_str::<Self>(json_data)
     }
 }
+
 
 impl WeatherController for DummyWeatherController {
     fn current_data(&self) -> Result<WeatherData, Box<dyn std::error::Error>> {

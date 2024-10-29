@@ -7,13 +7,12 @@ slint::include_modules!();
 
 use slint_workshop_common::weather::{CityData, DummyWeatherController, OpenWeatherController, WeatherControllerPointer, WeatherControllerSharedPointer};
 
-use async_std::task::spawn as spawn_task;
-
 
 struct App {
     ui: AppWindow,
     weather_controller: WeatherControllerSharedPointer,
     timer: slint::Timer,
+    records: std::rc::Rc<slint::VecModel<WeatherRecord>>,
 }
 
 impl From<slint_workshop_common::weather::WeatherData> for WeatherRecord {
@@ -39,21 +38,28 @@ impl App {
                 },
             api_key.into()))
         } else {
-            Box::new(DummyWeatherController::default())
+            Box::new(DummyWeatherController::new().unwrap())
         };
 
         let weather_controller = Arc::new(Mutex::new(data_controller));
+
+        let records: std::rc::Rc<slint::VecModel<WeatherRecord>> = std::rc::Rc::default();
+        let model = slint::ModelRc::from(records.clone());
+
+        ui.global::<ViewModel>().set_records(model);
 
         Ok(Self {
             ui,
             weather_controller,
             timer: slint::Timer::default(),
+            records,
         })
     }
 
     fn run(&mut self) -> Result<(), Box<dyn Error>> {
         let ui_handle = self.ui.as_weak();
         let weather_controller = self.weather_controller.clone();
+        let records = self.records.clone();
 
         self.timer.start(
             slint::TimerMode::Repeated,
@@ -63,10 +69,11 @@ impl App {
                 let model = ViewModel::get(&ui);
                 
                 let current_data = weather_controller.lock().unwrap().current_data().unwrap();
+                let record: WeatherRecord = current_data.into();
 
-                model.set_current(current_data.into());
+                records.push(record.clone());
 
-                log::info!("Timer tick");
+                model.set_current(record);
             },
         );
 

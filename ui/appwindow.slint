@@ -17,13 +17,18 @@ export component AppWindow inherits Window {
         Tab {
             title: "Temperature";
 
-            TemperaturePage {}
+            TemperaturePage {
+                temperature-celsius: ViewModel.current.temperature_celsius;
+                humidity-percent: ViewModel.current.humidity_percent;
+            }
         }
 
         Tab {
             title: "Recording";
 
-            RecordingPage {}
+            RecordingPage {
+                records: ViewModel.records;
+            }
         }
 
         Tab {

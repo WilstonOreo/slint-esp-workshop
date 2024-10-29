@@ -12,12 +12,6 @@ use crate::weather::weathercontroller::{
     PrecipitationData, TemperatureData, WeatherCondition, WeatherController, WeatherData,
 };
 
-
-const CITIES_STORED_FILE_NAME: &str = "cities_data.json";
-const ORGANIZATION_QUALIFIER: &str = "dev"; // have to match android app name in cargo.toml
-const ORGANIZATION_NAME: &str = "slint.examples"; // have to match android app name in cargo.toml
-const APPLICATION_NAME: &str = "weatherdemo"; // have to match app android name in cargo.toml
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WeatherClient {
     pub city_data: CityData,
@@ -25,7 +19,6 @@ pub struct WeatherClient {
 }
 
 pub struct OpenWeatherController {
-    weather_api: OpenWeather,
     client: Arc<Mutex<WeatherClient>>,
 }
 
@@ -100,14 +93,18 @@ impl OpenWeatherController {
         weather_api.one_call.fields.minutely = false;
         weather_api.one_call.fields.hourly = false;
         weather_api.one_call.fields.alerts = false;
+        let client = Arc::new(Mutex::new(WeatherClient::new(city_data.clone())));
 
-        Self {
-            weather_api,
-            client: Arc::new(Mutex::new(WeatherClient::new(city_data))),
-        }
+        let weather_client = client.clone();
+        std::thread::spawn(move || {
+            let mut weather_client = weather_client.lock().unwrap();
+            let result = &weather_client.refresh_weather(&weather_api);
+
+            std::thread::sleep(std::time::Duration::from_millis(2000));
+        });
+
+        Self { client }
     }
-
-
 
     fn weather_data_from_client(weather_client: &WeatherClient) -> WeatherData {
         weather_client.weather_data.as_ref().unwrap().into()
@@ -121,6 +118,7 @@ impl WeatherController for OpenWeatherController {
 
     fn current_data(&self) -> Result<WeatherData, Box<dyn std::error::Error>> {
         let weather_client = self.client.lock().unwrap();
+
         Ok(Self::weather_data_from_client(&weather_client))
     }
 }
