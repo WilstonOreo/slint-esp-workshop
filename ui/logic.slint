@@ -1,5 +1,5 @@
 
-struct WeatherRecord {
+export struct WeatherRecord {
     temperature_celsius: float,
     humidity_percent: float,
     timestamp: string,
@@ -8,11 +8,5 @@ struct WeatherRecord {
 export enum SensorStatus {
     Ok,
     Error,
-}
-
-export global ViewModel {
-    in property <SensorStatus> sensor-status;
-    in property <WeatherRecord> current;
-    in property <[WeatherRecord]> records;
 }
 

@@ -1,8 +1,6 @@
 // Copyright © SixtyFPS GmbH <info@slint.dev>
 // SPDX-License-Identifier: MIT
 
-#![cfg(all(not(target_arch = "wasm32"), feature = "open_weather"))]
-
 use chrono::DateTime;
 use openweather_sdk::responses::{GeocodingResponse, OneCallResponse};
 use openweather_sdk::{Language, OpenWeather, Units};
@@ -157,6 +155,7 @@ impl OpenWeatherController {
                     description: weather_details.description.clone(),
                     condition: Self::weather_condition_from_icon_icon_type(&weather_details.icon),
                     current_temperature: current.temp,
+                    current_humidity: current.humidity as f64,
                     detailed_temperature: detailed_temp,
                     precipitation: PrecipitationData::default(),
                     uv_index: 0.0,
@@ -200,6 +199,7 @@ impl OpenWeatherController {
                                 &weather_details.icon,
                             ),
                             current_temperature: day_weather_data.temp.day,
+                            current_humidity: day_weather_data.humidity as f64,
                             detailed_temperature,
                             precipitation,
                             uv_index: day_weather_data.uvi,

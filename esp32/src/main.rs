@@ -102,9 +102,11 @@ fn main() -> anyhow::Result<()> {
             }
         },
     );
+
+    let model = ViewModel::get(&ui);
     
     // Set the initial brightness
-    ui.on_screen_brightness_slider_changed(|value| {
+    model.on_screen_brightness_changed(|value| {
         esp32::set_brightness(value);
     });
 

@@ -1,18 +1,16 @@
 
 import { Button, VerticalBox, HorizontalBox, TabWidget, Slider } from "std-widgets.slint";
 
-import { ViewModel } from "logic.slint";
 
 import { StatusBar, TitleBar, TemperatureBar, HumidityBar, Page } from "widgets.slint";
 
 export component TemperaturePage inherits Page {
+    in property temperature-celsius <=> temperature-bar.value;
+    in property humidity-percent <=> humidity-bar.value;
+
     HorizontalBox {
-        TemperatureBar {
-            value: ViewModel.current.temperature-celsius;
-        }
-        HumidityBar {
-            value: ViewModel.current.humidity-percent;
-        }
+        temperature-bar := TemperatureBar {}
+        humidity-bar := HumidityBar {}
     }
 }
 
@@ -24,7 +22,7 @@ export component RecordingPage inherits Page {
 }
 
 export component ScreenBrightnessPage inherits Page {
-    property screen-brightness <=> slider.value;
+    out property screen-brightness <=> slider.value;
     callback screen-brightness-changed(float);
     
     padding: 4px;

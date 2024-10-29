@@ -1,26 +1,38 @@
 import { TabWidget } from "std-widgets.slint";
 
-import { ViewModel } from "logic.slint";
-export { ViewModel } // Re-export ViewModel from logic.slint, to make it available in Rust.
+import { WeatherRecord, SensorStatus } from "logic.slint";
 
 import { AppWindow as Window } from "widgets.slint";
 import { TemperaturePage, ScreenBrightnessPage } from "pages.slint";
 
+
+export global ViewModel {
+    in property <SensorStatus> sensor-status;
+    in property <WeatherRecord> current;
+
+    pure callback screen-brightness-changed(float);
+}
+
+
 export component AppWindow inherits Window {
-    callback screen-brightness-slider-changed <=> screen-brightness-page.screen-brightness-changed;
     status-bar-text: ViewModel.current.timestamp;
 
     TabWidget {
         Tab {
             title: "Temperature";
 
-            TemperaturePage {}
+            TemperaturePage {
+                temperature-celsius: ViewModel.current.temperature_celsius;
+                humidity-percent: ViewModel.current.humidity_percent;
+            }
         }
 
         Tab {
             title: "Brightness";
 
-            screen-brightness-page := ScreenBrightnessPage {}
+            ScreenBrightnessPage {
+                screen-brightness-changed => { ViewModel.screen-brightness-changed(self.screen-brightness); }
+            }
         }
     }
 }

@@ -5,10 +5,38 @@ use std::error::Error;
 
 slint::include_modules!();
 
+use slint_workshop_common::weather::WeatherControllerSharedPointer;
+
+struct App {
+    ui: AppWindow,
+    weather_controller: WeatherControllerSharedPointer,
+}
+
+impl App {
+    fn new() -> Result<Self, Box<dyn Error>> {
+        let ui = AppWindow::new()?;
+        let weather_controller = WeatherControllerSharedPointer::new();
+
+        Ok(Self {
+            ui,
+            weather_controller,
+        })
+    }
+
+    fn run(&mut self) -> Result<(), Box<dyn Error>> {
+        self.weather_controller.load()?;
+        self.ui.set_weather_controller(self.weather_controller.clone());
+
+        self.ui.run()?;
+
+        Ok(())
+    }
+}
+
+
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let ui = AppWindow::new()?;
+    let mut app = App::new()?;
 
-    ui.run()?;
-
-    Ok(())
+    app.run()
 }

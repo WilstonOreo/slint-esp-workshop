@@ -1,12 +1,15 @@
 [package]
-name = "slint-rust-template"
-version = "0.1.0"
+name = "slint-workshop-winit"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1"
 slint = "1.8"
+
+slint-workshop-common = { path = "../common", features = ["weather"] }
 
 [build-dependencies]
 slint-build = "1.8"
