@@ -1,6 +1,6 @@
 import { TabWidget } from "std-widgets.slint";
 
-import { WeatherRecord, SensorStatus } from "logic.slint";
+import { WeatherRecord, SensorStatus } from "datatypes.slint";
 
 import { AppWindow as Window } from "widgets.slint";
 import { TemperaturePage, ScreenBrightnessPage } from "pages.slint";
@@ -15,7 +15,9 @@ export global ViewModel {
 
 
 export component AppWindow inherits Window {
-    status-bar-text: ViewModel.current.timestamp;
+    status-bar-text: 
+        ViewModel.sensor-status == SensorStatus.Error ? "Sensor error" :
+        ViewModel.current.timestamp;
 
     TabWidget {
         Tab {
@@ -23,7 +25,9 @@ export component AppWindow inherits Window {
 
             TemperaturePage {
                 temperature-celsius: ViewModel.current.temperature_celsius;
+                has-temperature: ViewModel.sensor-status == SensorStatus.Ok;
                 humidity-percent: ViewModel.current.humidity_percent;
+                has-humidity: ViewModel.sensor-status == SensorStatus.Ok;
             }
         }
 

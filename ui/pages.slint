@@ -1,12 +1,10 @@
-
-import { Button, VerticalBox, HorizontalBox, TabWidget, Slider } from "std-widgets.slint";
-
-
-import { StatusBar, TitleBar, TemperatureBar, HumidityBar, Page } from "widgets.slint";
+import { StatusBar, TitleBar, TemperatureBar, HumidityBar, Page, HorizontalBox, Slider } from "widgets.slint";
 
 export component TemperaturePage inherits Page {
     in property temperature-celsius <=> temperature-bar.value;
+    in property has-temperature <=> temperature-bar.has-value;
     in property humidity-percent <=> humidity-bar.value;
+    in property has-humidity <=> humidity-bar.has-value;
 
     HorizontalBox {
         temperature-bar := TemperatureBar {}
