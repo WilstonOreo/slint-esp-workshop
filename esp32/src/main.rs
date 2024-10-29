@@ -117,13 +117,20 @@ fn main() -> anyhow::Result<()> {
     use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
     let peripherals = esp_idf_svc::hal::peripherals::Peripherals::take()?;
     let sys_loop = EspSystemEventLoop::take()?;
+    let timer_service = esp_idf_svc::timer::EspTaskTimerService::new()?;
     let nvs = EspDefaultNvsPartition::take()?;
     
-    let mut wifi = esp_idf_svc::wifi::BlockingWifi::wrap(
+    let mut wifi = esp_idf_svc::wifi::AsyncWifi::wrap(
             esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs)).unwrap(),
             sys_loop,
+            timer_service,
         ).unwrap();
-    wifi::connect(&mut wifi).unwrap(); 
+
+    esp_idf_svc::hal::task::block_on(wifi::connect(&mut wifi))?;
+
+    let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
+
+    log::info!("Wifi DHCP info: {:?}", ip_info);
 
     ui.run().map_err(|e| anyhow::anyhow!(e))
 }

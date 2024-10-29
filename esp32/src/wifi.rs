@@ -2,9 +2,9 @@
 const SSID: &str = env!("WIFI_SSID");
 const PASSWORD: &str = env!("WIFI_PASS");
 
-type Wifi = esp_idf_svc::wifi::BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>;
+type Wifi = esp_idf_svc::wifi::AsyncWifi<esp_idf_svc::wifi::EspWifi<'static>>;
 
-pub fn connect(wifi: &mut Wifi) -> anyhow::Result<()> {
+pub async fn connect(wifi: &mut Wifi) -> anyhow::Result<()> {
     use log::{error, info};
     use embedded_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
     
@@ -19,13 +19,13 @@ pub fn connect(wifi: &mut Wifi) -> anyhow::Result<()> {
 
     wifi.set_configuration(&wifi_configuration)?;
 
-    wifi.start()?;
+    wifi.start().await?;
     info!("Wifi started");
 
-    wifi.connect()?;
+    wifi.connect().await?;
     info!("Wifi connected");
 
-    wifi.wait_netif_up()?;
+    wifi.wait_netif_up().await?;
     info!("Wifi netif up");
 
     Ok(())
