@@ -1,6 +1,10 @@
 
 import { Palette, StyleMetrics } from "style.slint";
 
+export component Page inherits Rectangle {
+    background: #ffffff;
+}
+
 export component TitleBar inherits Rectangle {
     in property <string> text <=> text.text;
 
