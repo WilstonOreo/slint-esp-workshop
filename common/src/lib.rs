@@ -1,4 +1,6 @@
 
+
+#[cfg(feature = "weather")]
 pub mod weather;
 
 /// Convenience helper for passing the last of a value between threads. For example from a thread
