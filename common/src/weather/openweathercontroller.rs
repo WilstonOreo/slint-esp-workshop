@@ -97,12 +97,15 @@ impl OpenWeatherController {
 
         let weather_client = client.clone();
         std::thread::spawn(move || {
-            let mut weather_client = weather_client.lock().unwrap();
             let run_time = tokio::runtime::Runtime::new().unwrap();
 
-            run_time.block_on(weather_client.refresh_weather(&weather_api)).unwrap();
-
-            std::thread::sleep(std::time::Duration::from_millis(2000));
+            loop {
+                {
+                    let mut weather_client = weather_client.lock().unwrap();
+                    run_time.block_on(weather_client.refresh_weather(&weather_api)).unwrap();
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10000));
+            }
         });
 
         Self { client }
