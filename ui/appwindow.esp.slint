@@ -1,51 +1,16 @@
-/// Import the datatypes.slint module to access the WeatherRecord and SensorStatus types.
-import { WeatherRecord, SensorStatus } from "datatypes.slint";
-
 /// The Base class is imported as Window from widgets.slint.
 import { AppWindow as Window } from "widgets.slint";
 
 import { TabWidget } from "std-widgets.slint";
 
-import { TemperaturePage, ScreenBrightnessPage } from "pages.slint";
+import { SensorStatus } from "datatypes.slint";
 
-/// The ViewModel for the application.
-export global ViewModel {
-    /// The status of the sensor.
-    in property <SensorStatus> sensor-status;
-
-    /// The current weather record fetched from the sensor.
-    in property <WeatherRecord> current;
-
-    /// A callback to react to changes in the screen brightness.
-    /// The float parameter is the new brightness level in percent.
-    pure callback screen-brightness-changed(float);
-}
+export { SensorStatus }
 
 
 export component AppWindow inherits Window {
-    status-bar-text: 
-        ViewModel.sensor-status == SensorStatus.Error ? "Sensor error" :
-        ViewModel.current.timestamp;
+    width: 320px;
+    height: 240px;
 
-    /// Each page in the tab widget is a separate tab.
-    TabWidget {
-        Tab {
-            title: "Temperature";
-
-            TemperaturePage {
-                temperature-celsius: ViewModel.current.temperature_celsius;
-                has-temperature: ViewModel.sensor-status == SensorStatus.Ok;
-                humidity-percent: ViewModel.current.humidity_percent;
-                has-humidity: ViewModel.sensor-status == SensorStatus.Ok;
-            }
-        }
-
-        Tab {
-            title: "Brightness";
-
-            ScreenBrightnessPage {
-                screen-brightness-changed => { ViewModel.screen-brightness-changed(self.screen-brightness); }
-            }
-        }
-    }
+    Text { text: "Welcome to the Slint Workshop"; }
 }

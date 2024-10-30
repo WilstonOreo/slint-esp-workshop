@@ -6,6 +6,33 @@ mod esp32;
 
 slint::include_modules!();
 
+/// Our App struct that holds the UI
+struct App {
+    ui: AppWindow,
+}
+
+
+impl App {
+    /// Create a new App struct.
+    /// 
+    /// The App struct initializes the UI and the weather controller.
+    fn new() -> anyhow::Result<Self> {        
+        // Make a new AppWindow
+        let ui = AppWindow::new().map_err(|e| anyhow::anyhow!(e))?;
+
+        // Return the App struct
+        Ok(Self {
+            ui,
+        })
+    }
+
+    /// Run the App
+    fn run(&mut self) -> anyhow::Result<()> {
+        // Run the UI (and map an error to an anyhow::Error).
+        self.ui.run().map_err(|e| anyhow::anyhow!(e))
+    }
+}
+
 
 /// The struct that stores the sensor data.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -23,52 +50,13 @@ struct SensorData {
     status: SensorStatus,
 }
 
-impl From<SensorData> for WeatherRecord {
-    fn from(data: SensorData) -> Self {
-        WeatherRecord {
-            temperature_celsius: data.temperature_celsius,
-            humidity_percent: data.humidity_percent,
-            timestamp: slint::SharedString::from(data.when.as_secs().to_string()),
-        }
-    }
-}
-
 
 fn dht_task(last: ValueStore<SensorData>) {
-    let start = Instant::now();
     let pin = 13;
     let dht = dht22::DHT22::new(pin);
 
-    let mut error_count = 0;
-    let max_errors = 5;
-
     loop {
-        match dht.read() {
-            Ok((temperature_celsius, humidity_percent)) => {
-                last.set(SensorData {
-                    temperature_celsius,
-                    humidity_percent,
-                    when: Instant::now().duration_since(start),
-                    status: SensorStatus::Ok,
-                });
-                error_count = 0;
-            }
-            Err(e) => {                
-                error_count += 1;
-
-                if error_count >= max_errors {
-                    log::error!("Error reading DHT22: {:?}", e);
-
-                    last.set(SensorData {
-                        temperature_celsius: 0.0,
-                        humidity_percent: 0.0,
-                        when: Instant::now().duration_since(start),
-                        status: SensorStatus::Error,
-                    });
-                }
-            }
-        }
-
+        // Implement the logic to handle the sensor data
         std::thread::sleep(Duration::from_millis(2000));
     }
 }
@@ -89,36 +77,7 @@ fn main() -> anyhow::Result<()> {
     let last_for_dht_task = last_sensor_data.clone();
     std::thread::spawn(move || dht_task(last_sensor_data));
 
-    // Finally, run the app!
-    let ui = AppWindow::new().expect("Failed to load UI");
-    let ui_handle = ui.as_weak();
+    let mut app = App::new()?;
 
-    // Start the timer to update the UI
-    let timer = slint::Timer::default();
-    timer.start(
-        slint::TimerMode::Repeated,
-        std::time::Duration::from_millis(2000),
-        move || {
-            let ui = ui_handle.unwrap();
-            let model = ViewModel::get(&ui);
-            match last_for_dht_task.get() {
-                None => {
-                    model.set_sensor_status(SensorStatus::Error);
-                }
-                Some(data) => {
-                    model.set_current(data.into());
-                    model.set_sensor_status(SensorStatus::Ok);
-                }
-            }
-        },
-    );
-
-    let model = ViewModel::get(&ui);
-    
-    // Set the initial brightness
-    model.on_screen_brightness_changed(|value| {
-        esp32::set_brightness(value);
-    });
-
-    ui.run().map_err(|e| anyhow::anyhow!(e))
+    app.run()
 }
