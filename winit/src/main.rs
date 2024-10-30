@@ -41,11 +41,14 @@ impl App {
             Box::new(DummyWeatherController::new().unwrap())
         };
 
+        // Create a shared weather controller
         let weather_controller = Arc::new(Mutex::new(data_controller));
 
+        // Create a shared model for the weather records
         let records: std::rc::Rc<slint::VecModel<WeatherRecord>> = std::rc::Rc::default();
+        
+        // Initialize the view model with the records
         let model = slint::ModelRc::from(records.clone());
-
         ui.global::<ViewModel>().set_records(model);
 
         Ok(Self {

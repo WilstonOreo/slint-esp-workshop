@@ -98,7 +98,9 @@ impl OpenWeatherController {
         let weather_client = client.clone();
         std::thread::spawn(move || {
             let mut weather_client = weather_client.lock().unwrap();
-            let result = &weather_client.refresh_weather(&weather_api);
+            let run_time = tokio::runtime::Runtime::new().unwrap();
+
+            run_time.block_on(weather_client.refresh_weather(&weather_api)).unwrap();
 
             std::thread::sleep(std::time::Duration::from_millis(2000));
         });
@@ -145,4 +147,26 @@ impl WeatherClient {
             Err(e) => Err(e),
         }
     }
+}
+
+#[test]
+fn test_open_weather_controller() {
+    let controller = OpenWeatherController::new(
+        CityData {
+            city_name: "Florence".into(),
+            lat: 43.77,
+            lon: 11.25,
+        },
+        std::option_env!("OPEN_WEATHER_API_KEY").unwrap().into()
+    );
+
+
+    std::thread::sleep(std::time::Duration::from_secs(3));
+
+    let data = controller.current_data().unwrap();
+    println!("Weather data: {:?}", data);
+
+    let city_data = controller.city_data().unwrap();
+    assert_eq!(city_data.city_name, "Florence");
+
 }
