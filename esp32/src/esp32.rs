@@ -10,7 +10,7 @@ pub struct EspPlatform {
 impl EspPlatform {
     const DISPLAY_WIDTH: usize = 320;
     const DISPLAY_HEIGHT: usize = 240;
-    const DRAW_BUFFER_SIZE: usize = Self::DISPLAY_WIDTH * Self::DISPLAY_HEIGHT;
+    const DISPLAY_PIXEL_COUNT: usize = Self::DISPLAY_WIDTH * Self::DISPLAY_HEIGHT;
 
     /// Create a new instance of the platform
     pub fn new() -> std::boxed::Box<Self> {
@@ -26,7 +26,7 @@ impl EspPlatform {
         let mut panel_handle: esp_lcd_panel_handle_t = std::ptr::null_mut();
 
         let bsp_disp_cfg = bsp_display_config_t {
-            max_transfer_sz: (Self::DRAW_BUFFER_SIZE
+            max_transfer_sz: (Self::DISPLAY_PIXEL_COUNT
                 * std::mem::size_of::<slint::platform::software_renderer::Rgb565Pixel>())
                 as i32,
         };
@@ -91,7 +91,7 @@ impl slint::platform::Platform for EspPlatform {
 
             // Create a buffer to draw the scene
             use slint::platform::software_renderer::Rgb565Pixel;
-            let mut buffer = vec![Rgb565Pixel(0x0); Self::DRAW_BUFFER_SIZE];
+            let mut buffer = vec![Rgb565Pixel(0x0); Self::DISPLAY_PIXEL_COUNT];
 
             loop {
                 slint::platform::update_timers_and_animations();
@@ -100,7 +100,8 @@ impl slint::platform::Platform for EspPlatform {
                     let mut touchpad_x = [0];
                     let mut touchpad_y = [0];
                     let mut touchpad_cnt = [0_u8];
-
+                    
+                    // Read from ESP touch controller
                     esp_lcd_touch_read_data(touch_handle);
 
                     let touchpad_pressed = esp_lcd_touch_get_coordinates(
@@ -115,7 +116,8 @@ impl slint::platform::Platform for EspPlatform {
                     if touchpad_pressed && touchpad_cnt[0] > 0 {
                         last_position =
                             slint::LogicalPosition::new(touchpad_x[0] as f32, touchpad_y[0] as f32);
-
+                        
+                        // Dispatch the pointer moved event
                         self.window
                             .dispatch_event(slint::platform::WindowEvent::PointerMoved {
                                 position: last_position,
@@ -128,7 +130,6 @@ impl slint::platform::Platform for EspPlatform {
                                     button: slint::platform::PointerEventButton::Left,
                                 },
                             );
-                            log::info!("Touchpad pressed: {:?}", last_position);
                         }
 
                         touch_down = true;
@@ -187,3 +188,14 @@ impl slint::platform::Platform for EspPlatform {
         }
     }
 }
+
+/// Set the brightness of the display
+pub fn set_brightness(brightness: f32) {
+    unsafe {
+        use esp_idf_svc::hal::sys::*;
+        let brightness = brightness as i32;
+        log::info!("Setting brightness to {}", brightness);
+        bsp_display_brightness_set(brightness);
+    }
+}
+

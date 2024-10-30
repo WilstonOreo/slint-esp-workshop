@@ -1,8 +1,10 @@
 
+/// DHT22 driver for ESP32
 pub struct DHT22 {
     pin: i32
 }
 
+/// DHT22 errors
 #[derive(Debug)]
 pub enum DHT22Error {
     ChecksumError,
@@ -10,15 +12,18 @@ pub enum DHT22Error {
 }
 
 impl DHT22 {
+    /// Maximum DHT data in bytes
     const MAX_DHT_DATA: usize = 5;
 
+    /// Create a new DHT22 instance
     pub fn new(pin: i32) -> Self {
         Self {
             pin
         }
     }
 
-    pub fn get_signal_level(&self, max_wait: i32, state: i32) -> i32 {
+    /// Get the signal level, max wait and state
+    fn get_signal_level(&self, max_wait: i32, state: i32) -> i32 {
         use esp_idf_svc::sys::*;
 
         let mut u_sec: i32 = 0;
@@ -35,6 +40,7 @@ impl DHT22 {
         u_sec
     }
 
+    /// Read the DHT22 sensor
     pub fn read(&self) -> Result<(f32, f32), DHT22Error> {
         use esp_idf_svc::sys::*;
 
@@ -136,3 +142,4 @@ impl DHT22 {
         }
     }
 }
+
