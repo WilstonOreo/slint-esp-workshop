@@ -7,6 +7,9 @@ use crate::weather::weathercontroller::{
     CityData, WeatherData, WeatherController,
 };
 
+/// The DummyWeatherController is a dummy implementation of the WeatherController trait
+/// 
+/// It reads the data from a JSON file and returns the data as is.
 #[derive(Deserialize)]
 pub struct DummyWeatherController {
     city_data: CityData,

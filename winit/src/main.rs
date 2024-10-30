@@ -58,6 +58,10 @@ impl App {
         // Initialize the view model with the records
         let model = slint::ModelRc::from(records.clone());
         ui.global::<ViewModel>().set_records(model);
+        ui.global::<ViewModel>().set_city_name(
+            slint::SharedString::from(
+            weather_controller.lock().unwrap().city_data().unwrap().city_name)
+        );
 
         // Return the App struct
         Ok(Self {

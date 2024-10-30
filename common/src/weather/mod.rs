@@ -13,5 +13,3 @@ mod openweathercontroller;
 
 #[cfg(feature = "weather")]
 pub use openweathercontroller::OpenWeatherController;
-
-pub mod utils;

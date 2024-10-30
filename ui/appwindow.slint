@@ -1,17 +1,27 @@
+
+/// The Base class is imported as Window from widgets.slint.
+import { AppWindow as Window } from "widgets.slint";
 import { TabWidget } from "std-widgets.slint";
 
-import { AppWindow as Window } from "widgets.slint";
+/// Import the pages.slint module to access the TemperaturePage, RecordingPage, and ForecastPage components.
 import { ForecastPage, TemperaturePage, RecordingPage } from "pages.slint";
 
+/// Import the datatypes.slint module to access the WeatherRecord type.
 import { WeatherRecord } from "datatypes.slint";
 
+/// The ViewModel for the application.
 export global ViewModel {
+    /// The current weather record fetched from the OpenWeatherMap API.
     in property <WeatherRecord> current;
+
+    /// The list of weather records stored
     in property <[WeatherRecord]> records;
+    in property <string> city-name;
 }
 
 export component AppWindow inherits Window {
-    status-bar-text: ViewModel.current.timestamp;
+    /// Display the system time and city name in the status bar.
+    status-bar-text: ViewModel.current.timestamp + " " + ViewModel.city-name;
 
     TabWidget {
         Tab {
@@ -29,12 +39,6 @@ export component AppWindow inherits Window {
             RecordingPage {
                 records: ViewModel.records;
             }
-        }
-
-        Tab {
-            title: "Forecast";
-
-            ForecastPage {}
         }
     }
 }

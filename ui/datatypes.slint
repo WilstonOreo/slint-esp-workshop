@@ -1,10 +1,12 @@
 
+/// WeatherRecord is a record of weather data, used in the UI.
 export struct WeatherRecord {
     temperature_celsius: float,
     humidity_percent: float,
     timestamp: string,
 }
 
+/// SensorStatus is the status of a sensor.
 export enum SensorStatus {
     Ok,
     Error,

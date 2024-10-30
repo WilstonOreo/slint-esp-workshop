@@ -6,15 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1"
-async-std = "1.12.0"
-env_logger = "0.11.3"
-chrono = "0.4"
-log = { version = "0.4", default-features = false }
+anyhow = "1"                                        # Use anyhow for error handling
+env_logger = "0.11.3"                               # Use env_logger for logging
+chrono = "0.4"                                      # To display the current time
+log = { version = "0.4", default-features = false } # Use log for logging
 
-slint = "1.8"
+slint = "1.8" # Use the slint library for the UI
 
+# Include the common package as a dependency, with the weather feature enabled
 slint-workshop-common = { path = "../common", features = ["weather"] }
 
 [build-dependencies]
-slint-build = "1.8"
+slint-build = "1.8" # To compile slint files into Rust code at compile time

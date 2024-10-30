@@ -6,10 +6,12 @@ import { HorizontalBox, Slider } from "std-widgets.slint";
 // Re-export HorizontalBox and Slider from std-widgets.slint
 export { HorizontalBox, Slider }
 
+/// A page is a rectangle with a white background.
 export component Page inherits Rectangle {
-    background: #ffffff;
+    background: Palette.background;
 }
 
+/// A title bar is a rectangle with a gray background and centered text.
 export component TitleBar inherits Rectangle {
     in property <string> text <=> text.text;
 
@@ -24,6 +26,7 @@ export component TitleBar inherits Rectangle {
     }
 }
 
+/// A status bar is a rectangle with a light gray background and centered text.
 export component StatusBar inherits Rectangle {
     in property <string> text <=> text.text;
 
@@ -39,6 +42,7 @@ export component StatusBar inherits Rectangle {
     }
 }
 
+/// The indicator component displays a value within a range as a vertical bar.
 export component Indicator {
     in property <float> value: 40;
     in property <float> min-value: 0;

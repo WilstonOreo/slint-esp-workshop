@@ -2,38 +2,77 @@ import { StatusBar, TitleBar, TemperatureBar, HumidityBar, Page, HorizontalBox, 
 
 import { WeatherRecord } from "datatypes.slint";
 
+import { Palette } from "style.slint";
+
+/// The temperature page displays the current temperature and humidity.
 export component TemperaturePage inherits Page {
+    /// The current temperature in Celsius.
     in property temperature-celsius <=> temperature-bar.value;
+
+    /// The current humidity in percent.
     in property has-temperature <=> temperature-bar.has-value;
+
+    /// The current humidity in percent.
     in property humidity-percent <=> humidity-bar.value;
+
+    /// The current humidity in percent.
     in property has-humidity <=> humidity-bar.has-value;
 
+    /// The two bars are displayed side by side.
     HorizontalBox {
         temperature-bar := TemperatureBar {}
         humidity-bar := HumidityBar {}
     }
 }
 
+
+import { ListView, VerticalBox } from "std-widgets.slint";
+
 export component RecordingPage inherits Page {
     in property <[WeatherRecord]> records;
 
-    Flickable {
-        VerticalLayout {
-            for record in records : Rectangle {
+    VerticalBox {
+        header := HorizontalBox {
+            width: parent.width;
+            height: 32px;
+
+            for header_field in ["Time", "Temperature", "Humidity"] : Text {
+                text: header_field;
+                width: parent.width / 3;
+            }
+        }
+
+        ListView {
+            width: parent.width;
+            viewport-width: parent.width;
+            viewport-height: root.records.length * 32px;
+            
+            for record[index] in root.records : Rectangle {
+                width: parent.width;
+                background: index.mod(2) == 0 ? Palette.alternate-background : Palette.background;
+            
                 HorizontalBox {
-                    Text {
-                        text: record.timestamp;
-                    }
-                    Text {
-                        text: Math.round(record.temperature_celsius) + "°C";
-                    }
-                    Text {
-                        text: Math.round(record.humidity_percent) + "%";
+                    width: parent.width;
+                    for field in [
+                        record.timestamp,
+                        Math.round(record.temperature_celsius) + "°C",
+                        Math.round(record.humidity_percent) + "%"] : Text {
+                        text: field;
+                        width: parent.width / 3;
                     }
                 }
             }
-        }            
+        }
+
+         TouchArea {
+            width: parent.width;
+            height: parent.height;
+            clicked => { 
+                debug("Tapped on recording page");
+            }
+        }
     }
+
 }
 
 export component ForecastPage inherits Page {

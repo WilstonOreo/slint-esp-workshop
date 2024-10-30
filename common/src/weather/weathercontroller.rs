@@ -4,6 +4,8 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
+
+/// The city data.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct CityData {
     pub lat: f64,
@@ -11,6 +13,7 @@ pub struct CityData {
     pub city_name: String,
 }
 
+/// The weather condition.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub enum WeatherCondition {
     #[default]
@@ -26,6 +29,7 @@ pub enum WeatherCondition {
     Foggy,
 }
 
+/// The temperature data for a day.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct TemperatureData {
     pub min: f64,
@@ -36,13 +40,21 @@ pub struct TemperatureData {
     pub night: f64,
 }
 
+
+/// The precipitation data.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct PrecipitationData {
+    /// The probability of precipitation.
     pub probability: f64,
+
+    /// The volume of rain in mm.
     pub rain_volume: f64,
+
+    /// The volume of snow in mm.
     pub snow_volume: f64,
 }
 
+/// The weather data, which includes the current weather data.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct WeatherData {
     pub condition: WeatherCondition,
@@ -55,15 +67,6 @@ pub struct WeatherData {
     pub precipitation: PrecipitationData,
     pub uv_index: f64,
 }
-
-
-/* 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
-pub struct ForecastWeatherData {
-    pub day_name: String,
-    pub weather_data: WeatherData,
-}
-    */
 
 
 #[cfg(not(target_arch = "wasm32"))]

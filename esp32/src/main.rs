@@ -6,11 +6,20 @@ mod esp32;
 
 slint::include_modules!();
 
+
+/// The struct that stores the sensor data.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct SensorData {
+    /// The temperature in Celsius, read from the DHT22 sensor.
     temperature_celsius: f32,
+
+    /// The humidity in percent, read from the DHT22 sensor.
     humidity_percent: f32,
+
+    /// The time when the data was read.
     when: std::time::Duration,
+
+    /// The status of the sensor.
     status: SensorStatus,
 }
 
@@ -84,6 +93,7 @@ fn main() -> anyhow::Result<()> {
     let ui = AppWindow::new().expect("Failed to load UI");
     let ui_handle = ui.as_weak();
 
+    // Start the timer to update the UI
     let timer = slint::Timer::default();
     timer.start(
         slint::TimerMode::Repeated,
