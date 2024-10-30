@@ -1,4 +1,4 @@
-# Slint Template for ESP32-S3-BOX-3B and ESP-IDF
+# Slint Template for ESP32-S3-BOX-3B using ESP-IDF
 
 This is the Rust Slint Template for ESP32-S3-BOX-3B based on ESP-IDF.
 
@@ -8,15 +8,37 @@ Clone this template with:
 cargo generate https://github.com/WilstonOreo/slint-esp-workshop
 ```
 
-
 If required, please install `cargo-generate` beforehand:
 
 ```sh
 cargo install cargo-generate
 ```
 
+## Pre-requisites
 
-## Environment setup
+- Rust (minimum version 1.80)
+- An IDE, we will use VSCode and the Slint extension for this workshop
+
+## Repository structure
+
+- `winit` - Application code for `winit` based platforms, e.g. desktop environments.
+- `esp32` - Application code for ESP32-S3-BOX-3B based on ESP-IDF. This is 
+- `ui` - Shared Slint code for the UI.
+- `common` - Crate with shared Rust code for the ESP32 and desktop applications.
+
+## Environment setup for `winit`
+
+The `winit` build target is located in the `winit` directory.
+No special requirements. Simply install Rust on your system and choose any IDE or text editor you like.
+Do not forget to install the Rust extension for your IDE.
+
+## Environment setup for ESP32-S3-BOX-3B
+
+To build for the ESP32 box, you need to switch into the `esp32` directory, because due to some limitations of the ESP-IDF build system, it cannot be part of the Cargo workspace.
+
+```sh
+The following steps are required to set up the environment for the ESP32-S3-BOX-3B.
+
 
 Follow the prerequisites for
 [esp-idf-template](https://github.com/esp-rs/esp-idf-template?tab=readme-ov-file#prerequisites).
