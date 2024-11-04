@@ -36,7 +36,6 @@ Do not forget to install the Rust extension for your IDE.
 
 To build for the ESP32 box, you need to switch into the `esp32` directory, because due to some limitations of the ESP-IDF build system, it cannot be part of the Cargo workspace.
 
-```sh
 The following steps are required to set up the environment for the ESP32-S3-BOX-3B.
 
 
