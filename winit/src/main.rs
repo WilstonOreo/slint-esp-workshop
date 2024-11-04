@@ -6,7 +6,7 @@ slint::include_modules!();
 
 /// Our App struct that holds the UI
 struct App {
-    ui: AppWindow,
+    ui: MainWindow,
 }
 
 
@@ -16,7 +16,7 @@ impl App {
     /// The App struct initializes the UI and the weather controller.
     fn new() -> anyhow::Result<Self> {        
         // Make a new AppWindow
-        let ui = AppWindow::new()?;
+        let ui = MainWindow::new()?;
 
         // Return the App struct
         Ok(Self {
