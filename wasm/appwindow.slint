@@ -1,16 +1,11 @@
 /// The Base class is imported as Window from widgets.slint.
-import { AppWindow } from "widgets.slint";
+import { AppWindow } from "../ui/widgets.slint";
 
 import { TabWidget } from "std-widgets.slint";
 
-import { SensorStatus } from "datatypes.slint";
-
-export { SensorStatus }
-
-
 export component MainWindow inherits AppWindow {
-    width: 320px;
-    height: 240px;
-
+    preferred-height: 800px;
+    preferred-width: 600px;
+    
     Text { text: "Welcome to the Slint Workshop"; }
 }
