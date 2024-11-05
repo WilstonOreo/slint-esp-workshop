@@ -4,3 +4,4 @@
 /Cargo.lock
 /esp32/target
 /esp32/.embuild
+/wasm/target

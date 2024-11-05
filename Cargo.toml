@@ -2,11 +2,10 @@
 members = [
     "winit",
     "common",
-    #    "wasm"
     #    "android"
 ]
 
-exclude = ["esp32", "ui"]
+exclude = ["esp32", "ui", "wasm"]
 
 [workspace.package]
 name = "slint-workshop"
