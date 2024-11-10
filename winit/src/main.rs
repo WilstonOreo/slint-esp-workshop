@@ -17,7 +17,7 @@ use slint_workshop_common::weather::{CityData, DummyWeatherController, OpenWeath
 /// 
 /// Generally, I recommend to have an App struct in a Slint application that initializes the UI and the controllers.
 struct App {
-    ui: AppWindow,
+    ui: MainWindow,
     weather_controller: WeatherControllerSharedPointer,
     timer: slint::Timer,
     records: std::rc::Rc<slint::VecModel<WeatherRecord>>,
@@ -32,7 +32,7 @@ impl App {
     /// The App struct initializes the UI and the weather controller.
     fn new() -> anyhow::Result<Self> {        
         // Make a new AppWindow
-        let ui = AppWindow::new()?;
+        let ui = MainWindow::new()?;
 
         // Create a shared weather controller.
         // If the OPEN_WEATHER_API_KEY environment variable is set, use the OpenWeatherController, otherwise use the DummyWeatherController.
