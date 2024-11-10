@@ -1,12 +1,12 @@
 /// Import the datatypes.slint module to access the WeatherRecord and SensorStatus types.
-import { WeatherRecord, SensorStatus } from "datatypes.slint";
+import { WeatherRecord, SensorStatus } from "../ui/datatypes.slint";
 
 /// The Base class is imported as Window from widgets.slint.
-import { AppWindow as Window } from "widgets.slint";
+import { AppWindow } from "../ui/widgets.slint";
 
 import { TabWidget } from "std-widgets.slint";
 
-import { TemperaturePage, ScreenBrightnessPage } from "pages.slint";
+import { TemperaturePage, ScreenBrightnessPage } from "../ui/pages.slint";
 
 /// The ViewModel for the application.
 export global ViewModel {
@@ -22,7 +22,7 @@ export global ViewModel {
 }
 
 
-export component AppWindow inherits Window {
+export component MainWindow inherits AppWindow {
     status-bar-text: 
         ViewModel.sensor-status == SensorStatus.Error ? "Sensor error" :
         ViewModel.current.timestamp;

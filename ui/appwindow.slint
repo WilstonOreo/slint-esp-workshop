@@ -1,6 +1,6 @@
 
 /// The Base class is imported as Window from widgets.slint.
-import { AppWindow as Window } from "widgets.slint";
+import { AppWindow } from "widgets.slint";
 import { TabWidget } from "std-widgets.slint";
 
 /// Import the pages.slint module to access the TemperaturePage, RecordingPage, and ForecastPage components.
@@ -19,7 +19,7 @@ export global ViewModel {
     in property <string> city-name;
 }
 
-export component AppWindow inherits Window {
+export component MainWindow inherits AppWindow {
     /// Display the system time and city name in the status bar.
     status-bar-text: ViewModel.current.timestamp + " " + ViewModel.city-name;
 
