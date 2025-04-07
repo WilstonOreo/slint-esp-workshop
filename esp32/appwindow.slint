@@ -1,7 +1,7 @@
 /// The Base class is imported as Window from widgets.slint.
 import { AppWindow } from "../ui/widgets.slint";
 
-import { TabWidget } from "std-widgets.slint";
+import { TabWidget, Slider, HorizontalBox, Switch } from "std-widgets.slint";
 
 import { SensorStatus } from "../ui/datatypes.slint";
 
@@ -9,8 +9,16 @@ export { SensorStatus }
 
 
 export component MainWindow inherits AppWindow {
-    width: 320px;
-    height: 240px;
+    //width: 320px;
+    //height: 240px;
 
-    Text { text: "Welcome to the Slint Workshop"; }
+    VerticalLayout {
+        Text { text: "Welcome to the Slint Workshop"; horizontal-alignment: center; }
+        Text { text: "Screen resolution: \{root.width*1phx/1px/1phx} x \{root.height*1phx/1px/1phx}"; horizontal-alignment: center; }
+
+        Switch {
+            text: "This is a switch";
+        }
+    }
+
 }

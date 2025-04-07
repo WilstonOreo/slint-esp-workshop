@@ -34,7 +34,7 @@ num-traits = { version = "0.2.16", default-features = false, features = [
 ], optional = true }
 log = { version = "0.4", default-features = false }
 esp-idf-svc = { version = "0.51", default-features = false }
-slint = { version = "1.8", default-features = false, features = [
+slint = { version = "1.10", default-features = false, features = [
     "compat-1-2",
     "unsafe-single-threaded",
     "libm",
@@ -45,12 +45,15 @@ embedded-svc = { version = "0.28", default-features = false }
 
 portable-atomic = { version = "1", features = ["float"] }
 
+sitronix-touch = { version = "0.0.1" }
+eeprom24x = { version = "0.7.2" }
+embedded-hal-bus = { version = "0.3.0", features = ["alloc"] }
+
 slint-workshop-common = { path = "../common" }
 
 [build-dependencies]
 embuild = "0.33"
-slint-build = "1.8"
+slint-build = { version = "1.10", features = ["sdf-fonts"] }
 
 [[package.metadata.esp-idf-sys.extra_components]]
-remote_component = { name = "espressif/esp-box-3", version = "1.1.3" }
 bindings_header = "bindings.h"

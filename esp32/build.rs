@@ -3,7 +3,8 @@ fn main() {
     slint_build::compile_with_config(
         "appwindow.slint",
         slint_build::CompilerConfiguration::new()
-            .embed_resources(slint_build::EmbedResourcesKind::EmbedForSoftwareRenderer),
+            .embed_resources(slint_build::EmbedResourcesKind::EmbedForSoftwareRenderer)
+            .with_sdf_fonts(true),
     )
     .unwrap();
 }
