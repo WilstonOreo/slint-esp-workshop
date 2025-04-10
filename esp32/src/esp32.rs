@@ -99,7 +99,8 @@ impl EspPlatform {
             data_gpio_nums: [9, 17, 46, 16, 7, 8, 21, 3, 11, 18, 10, 14, 20, 13, 19, 12],
             ..Default::default()
         };
-        panel_config.__bindgen_anon_1.dma_burst_size = 64;
+        panel_config.sram_trans_align = 4;
+        panel_config.psram_trans_align = 64;
         panel_config.flags.set_fb_in_psram(1);
         panel_config
             .timings
@@ -132,7 +133,6 @@ impl EspPlatform {
                 esp_lcd_rgb_panel_register_event_callbacks(
                     panel_handle,
                     &esp_lcd_rgb_panel_event_callbacks_t {
-                        on_color_trans_done: None,
                         on_vsync: Some(vsync_callback),
                         on_bounce_empty: None,
                         ..Default::default()
