@@ -1,29 +1,39 @@
-use std::time::{Duration, Instant};
 use slint_workshop_common::ValueStore;
+use std::cell::RefCell;
+use std::time::{Duration, Instant};
 
 mod dht22;
 mod esp32;
 
 slint::include_modules!();
 
+use embedded_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
+
+use esp_idf_svc::hal::prelude::Peripherals;
+use esp_idf_svc::log::EspLogger;
+use esp_idf_svc::wifi::{BlockingWifi, EspWifi};
+use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
+
+use log::info;
+
+const SSID: &str = env!("WIFI_SSID");
+const PASSWORD: &str = env!("WIFI_PASS");
+
 /// Our App struct that holds the UI
 struct App {
     ui: MainWindow,
 }
 
-
 impl App {
     /// Create a new App struct.
-    /// 
+    ///
     /// The App struct initializes the UI and the weather controller.
-    fn new() -> anyhow::Result<Self> {        
+    fn new() -> anyhow::Result<Self> {
         // Make a new MainWindow
         let ui = MainWindow::new().map_err(|e| anyhow::anyhow!(e))?;
 
         // Return the App struct
-        Ok(Self {
-            ui,
-        })
+        Ok(Self { ui })
     }
 
     /// Run the App
@@ -32,7 +42,6 @@ impl App {
         self.ui.run().map_err(|e| anyhow::anyhow!(e))
     }
 }
-
 
 /// The struct that stores the sensor data.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -50,7 +59,6 @@ struct SensorData {
     status: SensorStatus,
 }
 
-
 fn dht_task(last: ValueStore<SensorData>) {
     let pin = 13;
     let dht = dht22::DHT22::new(pin);
@@ -61,6 +69,30 @@ fn dht_task(last: ValueStore<SensorData>) {
     }
 }
 
+fn connect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) -> anyhow::Result<()> {
+    let wifi_configuration: Configuration = Configuration::Client(ClientConfiguration {
+        ssid: SSID.try_into().unwrap(),
+        bssid: None,
+        auth_method: AuthMethod::WPA2Personal,
+        password: PASSWORD.try_into().unwrap(),
+        channel: None,
+        ..Default::default()
+    });
+
+    wifi.set_configuration(&wifi_configuration)?;
+
+    wifi.start()?;
+    info!("Wifi started");
+
+    wifi.connect()?;
+    info!("Wifi connected");
+
+    wifi.wait_netif_up()?;
+    info!("Wifi netif up");
+
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
@@ -69,13 +101,32 @@ fn main() -> anyhow::Result<()> {
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
 
+    let sys_loop = EspSystemEventLoop::take()?;
+    let nvs = EspDefaultNvsPartition::take()?;
+    let peripherals = Peripherals::take()?;
+
+    let platform = esp32::EspPlatform::new();
+    
     // Set the platform
-    slint::platform::set_platform(esp32::EspPlatform::new()).unwrap();
+    slint::platform::set_platform(platform).unwrap();
 
     // Launch the DHT task in a separate thread
     let last_sensor_data = ValueStore::<SensorData>::default();
     let last_for_dht_task = last_sensor_data.clone();
-    std::thread::spawn(move || dht_task(last_sensor_data));
+    //   std::thread::spawn(move || dht_task(last_sensor_data));
+
+    let mut wifi = BlockingWifi::wrap(
+        EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs))?,
+        sys_loop,
+    )?;
+
+    connect_wifi(&mut wifi)?;
+
+    let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
+
+    info!("Wifi DHCP info: {:?}", ip_info);
+
+    info!("Shutting down in 5s...");
 
     let mut app = App::new()?;
 
