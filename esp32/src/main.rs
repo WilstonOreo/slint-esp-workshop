@@ -84,8 +84,13 @@ fn connect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) -> anyhow::Result<()>
     wifi.start()?;
     info!("Wifi started");
 
-    wifi.connect()?;
-    info!("Wifi connected");
+    //wifi.connect()?;
+    //info!("Wifi connected");
+
+    let access_points = wifi.scan()?;
+    for access_point in access_points {
+        info!("Access point: {}", access_point.ssid);
+    }
 
     wifi.wait_netif_up()?;
     info!("Wifi netif up");
@@ -101,17 +106,12 @@ fn main() -> anyhow::Result<()> {
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
 
-
     let mut platform = esp32::EspPlatform::new();
-    
-    connect_wifi(&mut platform.wifi)?;
 
-    let ip_info = platform.wifi.wifi().sta_netif().get_ip_info()?;
+    //connect_wifi(&mut platform.wifi)?;
+    //let ip_info = platform.wifi.wifi().sta_netif().get_ip_info()?;
+    //info!("Wifi DHCP info: {:?}", ip_info);
 
-    info!("Wifi DHCP info: {:?}", ip_info);
-
-    info!("Shutting down in 5s...");
-    
     // Set the platform
     slint::platform::set_platform(platform).unwrap();
 
@@ -119,7 +119,6 @@ fn main() -> anyhow::Result<()> {
     let last_sensor_data = ValueStore::<SensorData>::default();
     let last_for_dht_task = last_sensor_data.clone();
     //   std::thread::spawn(move || dht_task(last_sensor_data));
-
 
     let mut app = App::new()?;
 
