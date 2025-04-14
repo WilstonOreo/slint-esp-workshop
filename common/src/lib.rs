@@ -1,8 +1,3 @@
-
-
-#[cfg(feature = "weather")]
-pub mod weather;
-
 /// Convenience helper for passing the last of a value between threads. For example from a thread
 /// interfacing with a sensor to another one processing the data.
 #[derive(Clone, Default)]

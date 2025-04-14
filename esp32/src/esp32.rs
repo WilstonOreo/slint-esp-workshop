@@ -16,7 +16,7 @@ pub struct EspPlatform {
     >,
     window: alloc::rc::Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
     timer: esp_idf_svc::timer::EspTimerService<esp_idf_svc::timer::Task>,
-    pub wifi: BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>
+    pub wifi: BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>,
 }
 
 impl EspPlatform {
@@ -60,14 +60,6 @@ impl EspPlatform {
             eeid[7]
         );
 
-        let pclk_hz = ((eeid[12] as u32) * 1000000 + (eeid[13] as u32) * 100000).min(13600000);
-        let hsync_pulse_width = eeid[17] as u32;
-        let hsync_back_porch = u16::from_be_bytes([eeid[15], eeid[16]]) as u32;
-        let hsync_front_porch = u16::from_be_bytes([eeid[18], eeid[19]]) as u32;
-        let vsync_pulse_width = eeid[22] as u32;
-        let vsync_back_porch = u16::from_be_bytes([eeid[20], eeid[21]]) as u32;
-        let vsync_front_porch = u16::from_be_bytes([eeid[23], eeid[24]]) as u32;
-
         let hsync_idle_low = (eeid[25] & 0x01) == 0x01;
         let vsync_idle_low = (eeid[25] & 0x02) == 0x02;
         let de_idle_high = (eeid[25] & 0x04) == 0;
@@ -81,32 +73,31 @@ impl EspPlatform {
         let mut panel_config = esp_lcd_rgb_panel_config_t {
             clk_src: soc_periph_lcd_clk_src_t_LCD_CLK_SRC_PLL240M, //LCD_CLK_SRC_DEFAULT,
             timings: esp_lcd_rgb_timing_t {
-                pclk_hz,
+                pclk_hz: ((eeid[12] as u32) * 1000000 + (eeid[13] as u32) * 100000).min(13600000),
                 h_res: display_width as u32,
                 v_res: display_height as u32,
-                hsync_pulse_width,
-                hsync_back_porch,
-                hsync_front_porch,
-                vsync_pulse_width,
-                vsync_back_porch,
-                vsync_front_porch,
+                hsync_pulse_width: eeid[17] as u32,
+                hsync_back_porch: u16::from_be_bytes([eeid[15], eeid[16]]) as u32,
+                hsync_front_porch: u16::from_be_bytes([eeid[18], eeid[19]]) as u32,
+                vsync_pulse_width: eeid[22] as u32,
+                vsync_back_porch: u16::from_be_bytes([eeid[20], eeid[21]]) as u32,
+                vsync_front_porch: u16::from_be_bytes([eeid[23], eeid[24]]) as u32,
                 flags: Default::default(),
             },
             data_width: 16,
             bits_per_pixel: 16,
             num_fbs: 0,
             bounce_buffer_size_px: ((display_width * display_height) * 5) / 100,
-            sram_trans_align: 4,
             hsync_gpio_num: 15,
             vsync_gpio_num: 06,
             de_gpio_num: 05,
             pclk_gpio_num: 04,
             disp_gpio_num: 42,
             data_gpio_nums: [9, 17, 46, 16, 7, 8, 21, 3, 11, 18, 10, 14, 20, 13, 19, 12],
+            sram_trans_align: 4,
+            psram_trans_align: 64,
             ..Default::default()
         };
-        panel_config.sram_trans_align = 4;
-        panel_config.psram_trans_align = 64;
         panel_config.flags.set_fb_in_psram(1);
         panel_config
             .timings
@@ -178,10 +169,11 @@ impl EspPlatform {
         let nvs = esp_idf_svc::nvs::EspDefaultNvsPartition::take().unwrap();
 
         let mut wifi = BlockingWifi::wrap(
-            esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs)).unwrap(),
+            esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs))
+                .unwrap(),
             sys_loop,
-        ).unwrap();
-        
+        )
+        .unwrap();
 
         std::boxed::Box::new(Self {
             display_width,
