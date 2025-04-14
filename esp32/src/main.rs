@@ -1,19 +1,8 @@
-use slint_workshop_common::ValueStore;
-use std::cell::RefCell;
-use std::time::{Duration, Instant};
-
 mod esp32;
 
 slint::include_modules!();
 
-use embedded_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
-
-use esp_idf_svc::hal::prelude::Peripherals;
-use esp_idf_svc::log::EspLogger;
-use esp_idf_svc::wifi::{BlockingWifi, EspWifi};
-use esp_idf_svc::{eventloop::EspSystemEventLoop, nvs::EspDefaultNvsPartition};
-
-use log::info;
+use log::{error, info};
 
 const SSID: &str = env!("WIFI_SSID");
 const PASSWORD: &str = env!("WIFI_PASS");
@@ -42,7 +31,11 @@ impl App {
     }
 }
 
-fn connect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) -> anyhow::Result<()> {
+fn connect_wifi(
+    wifi: &mut esp_idf_svc::wifi::BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>,
+) -> anyhow::Result<()> {
+    use embedded_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
+
     let wifi_configuration: Configuration = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
         bssid: None,
@@ -57,12 +50,17 @@ fn connect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) -> anyhow::Result<()>
     wifi.start()?;
     info!("Wifi started");
 
-    //wifi.connect()?;
-    //info!("Wifi connected");
-
     let access_points = wifi.scan()?;
     for access_point in access_points {
         info!("Access point: {}", access_point.ssid);
+    }
+    match wifi.connect() {
+        Ok(_) => {
+            info!("Wifi connected");
+        }
+        Err(e) => {
+            error!("Wifi connection error: {e}");
+        }
     }
 
     //wifi.wait_netif_up()?;
@@ -82,8 +80,6 @@ fn main() -> anyhow::Result<()> {
     let mut platform = esp32::EspPlatform::new();
 
     connect_wifi(&mut platform.wifi)?;
-    //let ip_info = platform.wifi.wifi().sta_netif().get_ip_info()?;
-    //info!("Wifi DHCP info: {:?}", ip_info);
 
     // Set the platform
     slint::platform::set_platform(platform).unwrap();

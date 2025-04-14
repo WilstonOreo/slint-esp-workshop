@@ -1,13 +1,12 @@
 use std::cell::RefCell;
 
-use esp_idf_svc::{hal::prelude::Peripherals, wifi::BlockingWifi};
-
 extern crate alloc;
 
 pub struct EspPlatform {
     display_width: usize,
     display_height: usize,
     panel_handle: esp_idf_svc::hal::sys::esp_lcd_panel_handle_t,
+    #[allow(dead_code)]
     i2c_driver: alloc::rc::Rc<RefCell<esp_idf_svc::hal::i2c::I2cDriver<'static>>>,
     touch_driver: core::cell::RefCell<
         sitronix_touch::TouchIC<
@@ -16,7 +15,7 @@ pub struct EspPlatform {
     >,
     window: alloc::rc::Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
     timer: esp_idf_svc::timer::EspTimerService<esp_idf_svc::timer::Task>,
-    pub wifi: BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>,
+    pub wifi: esp_idf_svc::wifi::BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>,
 }
 
 impl EspPlatform {
@@ -67,7 +66,6 @@ impl EspPlatform {
         let pclk_idle_high = false;
 
         // Initialize LCD panel and touch
-        let mut io_handle: esp_lcd_panel_io_handle_t = std::ptr::null_mut();
         let mut panel_handle: esp_lcd_panel_handle_t = std::ptr::null_mut();
 
         let mut panel_config = esp_lcd_rgb_panel_config_t {
@@ -168,7 +166,7 @@ impl EspPlatform {
         let sys_loop = esp_idf_svc::eventloop::EspSystemEventLoop::take().unwrap();
         let nvs = esp_idf_svc::nvs::EspDefaultNvsPartition::take().unwrap();
 
-        let mut wifi = BlockingWifi::wrap(
+        let wifi = esp_idf_svc::wifi::BlockingWifi::wrap(
             esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs))
                 .unwrap(),
             sys_loop,
@@ -299,16 +297,6 @@ impl slint::platform::Platform for EspPlatform {
                 }
             }
         }
-    }
-}
-
-/// Set the brightness of the display
-pub fn set_brightness(brightness: f32) {
-    unsafe {
-        use esp_idf_svc::hal::sys::*;
-        let brightness = brightness as i32;
-        log::info!("Setting brightness to {}", brightness);
-        //bsp_display_brightness_set(brightness);
     }
 }
 
