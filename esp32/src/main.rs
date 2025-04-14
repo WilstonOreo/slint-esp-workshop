@@ -101,11 +101,16 @@ fn main() -> anyhow::Result<()> {
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    let sys_loop = EspSystemEventLoop::take()?;
-    let nvs = EspDefaultNvsPartition::take()?;
-    let peripherals = Peripherals::take()?;
 
-    let platform = esp32::EspPlatform::new();
+    let mut platform = esp32::EspPlatform::new();
+    
+    connect_wifi(&mut platform.wifi)?;
+
+    let ip_info = platform.wifi.wifi().sta_netif().get_ip_info()?;
+
+    info!("Wifi DHCP info: {:?}", ip_info);
+
+    info!("Shutting down in 5s...");
     
     // Set the platform
     slint::platform::set_platform(platform).unwrap();
@@ -115,18 +120,6 @@ fn main() -> anyhow::Result<()> {
     let last_for_dht_task = last_sensor_data.clone();
     //   std::thread::spawn(move || dht_task(last_sensor_data));
 
-    let mut wifi = BlockingWifi::wrap(
-        EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs))?,
-        sys_loop,
-    )?;
-
-    connect_wifi(&mut wifi)?;
-
-    let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
-
-    info!("Wifi DHCP info: {:?}", ip_info);
-
-    info!("Shutting down in 5s...");
 
     let mut app = App::new()?;
 

@@ -1,9 +1,14 @@
+use std::cell::RefCell;
+
+use esp_idf_svc::{hal::prelude::Peripherals, wifi::BlockingWifi};
+
 extern crate alloc;
 
 pub struct EspPlatform {
     display_width: usize,
     display_height: usize,
     panel_handle: esp_idf_svc::hal::sys::esp_lcd_panel_handle_t,
+    i2c_driver: alloc::rc::Rc<RefCell<esp_idf_svc::hal::i2c::I2cDriver<'static>>>,
     touch_driver: core::cell::RefCell<
         sitronix_touch::TouchIC<
             embedded_hal_bus::i2c::RcDevice<esp_idf_svc::hal::i2c::I2cDriver<'static>>,
@@ -11,6 +16,7 @@ pub struct EspPlatform {
     >,
     window: alloc::rc::Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
     timer: esp_idf_svc::timer::EspTimerService<esp_idf_svc::timer::Task>,
+    pub wifi: BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>
 }
 
 impl EspPlatform {
@@ -21,12 +27,12 @@ impl EspPlatform {
 
         /* Initialize I2C (for touch and audio) */
 
-        let p = Peripherals::take().unwrap();
+        let peripherals = Peripherals::take().unwrap();
 
-        let mut touch_i2c = esp_idf_svc::hal::i2c::I2cDriver::new(
-            p.i2c0,
-            p.pins.gpio1,
-            p.pins.gpio41,
+        let touch_i2c = esp_idf_svc::hal::i2c::I2cDriver::new(
+            peripherals.i2c0,
+            peripherals.pins.gpio1,
+            peripherals.pins.gpio41,
             &esp_idf_svc::hal::i2c::config::Config::new().baudrate(400_000.Hz()),
         )
         .unwrap();
@@ -168,13 +174,24 @@ impl EspPlatform {
             });
         }
 
+        let sys_loop = esp_idf_svc::eventloop::EspSystemEventLoop::take().unwrap();
+        let nvs = esp_idf_svc::nvs::EspDefaultNvsPartition::take().unwrap();
+
+        let mut wifi = BlockingWifi::wrap(
+            esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs)).unwrap(),
+            sys_loop,
+        ).unwrap();
+        
+
         std::boxed::Box::new(Self {
             display_width,
             display_height,
             panel_handle,
+            i2c_driver: touch_i2c,
             touch_driver: core::cell::RefCell::new(touch_driver),
             window,
             timer: esp_idf_svc::timer::EspTimerService::new().unwrap(),
+            wifi,
         })
     }
 }
