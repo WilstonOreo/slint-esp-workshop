@@ -65,8 +65,8 @@ fn connect_wifi(wifi: &mut BlockingWifi<EspWifi<'static>>) -> anyhow::Result<()>
         info!("Access point: {}", access_point.ssid);
     }
 
-    wifi.wait_netif_up()?;
-    info!("Wifi netif up");
+    //wifi.wait_netif_up()?;
+    //info!("Wifi netif up");
 
     Ok(())
 }
@@ -81,7 +81,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut platform = esp32::EspPlatform::new();
 
-    //connect_wifi(&mut platform.wifi)?;
+    connect_wifi(&mut platform.wifi)?;
     //let ip_info = platform.wifi.wifi().sta_netif().get_ip_info()?;
     //info!("Wifi DHCP info: {:?}", ip_info);
 
