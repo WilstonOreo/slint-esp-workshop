@@ -2,9 +2,17 @@
 /// The Base class is imported as Window from widgets.slint.
 import { AppWindow } from "widgets.slint";
 
+import { Switch } from "std-widgets.slint";
+
 export component MainWindow inherits AppWindow {
     width: 800px;
     height: 600px;
 
-    Text { text: "Welcome to the Slint Workshop"; }
+    Text {
+        text: "Welcome to the Slint Workshop";
+    }
+
+    Switch {
+        text: "This is a switch";
+    }
 }
