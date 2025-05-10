@@ -24,8 +24,7 @@ impl EspPlatform {
         use esp_idf_svc::hal::prelude::*;
         use esp_idf_svc::hal::sys::*;
 
-        /* Initialize I2C (for touch and audio) */
-
+        // Initialize I2C (for touch and audio)
         let peripherals = Peripherals::take().unwrap();
 
         let touch_i2c = esp_idf_svc::hal::i2c::I2cDriver::new(
@@ -38,6 +37,7 @@ impl EspPlatform {
 
         let touch_i2c = alloc::rc::Rc::new(core::cell::RefCell::new(touch_i2c));
 
+        // Read display size from EEPROM
         let mut eeprom = eeprom24x::Eeprom24x::new_24x01(
             embedded_hal_bus::i2c::RcDevice::new(touch_i2c.clone()),
             eeprom24x::SlaveAddr::Default,
@@ -45,8 +45,6 @@ impl EspPlatform {
 
         let mut eeid = [0u8; 0x1c];
         eeprom.read_data(0x0, &mut eeid).unwrap();
-
-        //log::info!("EEPROM {:x?}", eeid);
 
         let display_width = u16::from_be_bytes([eeid[8], eeid[9]]) as usize;
         let display_height = u16::from_be_bytes([eeid[10], eeid[11]]) as usize;
@@ -154,6 +152,7 @@ impl EspPlatform {
             display_height as u32,
         ));
 
+        // Change the scale factor for larger displays
         if display_width > 500 {
             window.dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged {
                 scale_factor: 2.0,
