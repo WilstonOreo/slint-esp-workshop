@@ -1,6 +1,6 @@
-# Slint Template for ESP32-S3-BOX-3B using ESP-IDF
+# Slint Template for ESoPE board and ESP-IDF
 
-This is the Rust Slint Template for ESP32-S3-BOX-3B based on ESP-IDF.
+This is the Rust Slint Template for ESoPE board based on ESP-IDF.
 
 Clone this template with:
 
@@ -19,6 +19,14 @@ cargo install cargo-generate
 - Rust (minimum version 1.80)
 - An IDE, we will use VSCode and the Slint extension for this workshop
 
+### RustRover setup
+
+In RustRover, press *Ctrl+Shift+X* to get into the RustRover Plugins menu and install the Slint plugin from the marketplace.
+
+### VSCode setup
+
+Switch to extensions and install the Slint extension.
+
 ## Repository structure
 
 - `winit` - Application code for `winit` based platforms, e.g. desktop environments.
@@ -32,9 +40,9 @@ The `winit` build target is located in the `winit` directory.
 No special requirements. Simply install Rust on your system and choose any IDE or text editor you like.
 Do not forget to install the Rust extension for your IDE.
 
-## Environment setup for ESP32-S3-BOX-3B
+## Environment setup for ESoPE
 
-To build for the ESP32 box, you need to switch into the `esp32` directory, because due to some limitations of the ESP-IDF build system, it cannot be part of the Cargo workspace.
+To build, you need to switch into the `esp32` directory, because due to some limitations of the ESP-IDF build system, it cannot be part of the Cargo workspace.
 
 The following steps are required to set up the environment for the ESP32-S3-BOX-3B.
 
@@ -84,7 +92,6 @@ wsl --install
 ```
 
 Open a new WSL shell and do the following steps:
-
 
 
 #### 1. Update dependencies 
