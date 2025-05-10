@@ -4,9 +4,6 @@ slint::include_modules!();
 
 use log::{error, info};
 
-const SSID: &str = env!("WIFI_SSID");
-const PASSWORD: &str = env!("WIFI_PASS");
-
 /// Our App struct that holds the UI
 struct App {
     ui: MainWindow,
@@ -31,10 +28,14 @@ impl App {
     }
 }
 
+/*
 fn connect_wifi(
     wifi: &mut esp_idf_svc::wifi::BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>,
 ) -> anyhow::Result<()> {
     use embedded_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
+
+    const SSID: &str = env!("WIFI_SSID");
+    const PASSWORD: &str = env!("WIFI_PASS");
 
     let wifi_configuration: Configuration = Configuration::Client(ClientConfiguration {
         ssid: SSID.try_into().unwrap(),
@@ -68,6 +69,7 @@ fn connect_wifi(
 
     Ok(())
 }
+*/
 
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -79,7 +81,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut platform = esp32::EspPlatform::new();
 
-    connect_wifi(&mut platform.wifi)?;
+    //connect_wifi(&mut platform.wifi)?;
 
     // Set the platform
     slint::platform::set_platform(platform).unwrap();
