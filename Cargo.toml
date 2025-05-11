@@ -1,8 +1,5 @@
 [workspace]
-members = [
-    "winit",
-    "common",
-]
+members = ["winit", "model"]
 
 exclude = ["esp32", "ui", "wasm", "android"]
 

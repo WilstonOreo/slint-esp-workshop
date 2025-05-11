@@ -2,17 +2,33 @@
 /// The Base class is imported as Window from widgets.slint.
 import { AppWindow } from "widgets.slint";
 
-import { Switch } from "std-widgets.slint";
+import { Switch, TabWidget, AboutSlint } from "std-widgets.slint";
+import { WifiNetworkPage } from "pages.slint";
+
+import { WifiNetwork } from "viewmodel.slint";
 
 export component MainWindow inherits AppWindow {
     width: 800px;
     height: 600px;
+    in property <[WifiNetwork]> wifi_network_model <=> wifi.model;
 
-    Text {
-        text: "Welcome to the Slint Workshop";
-    }
+    callback wifi_refresh;
 
-    Switch {
-        text: "This is a switch";
+    TabWidget {
+        Tab {
+            title: @tr("Wifi");
+
+            wifi := WifiNetworkPage {
+                refresh => {
+                    root.wifi_refresh();
+                }
+            }
+        }
+
+        Tab {
+            title: @tr("About");
+
+            AboutSlint { }
+        }
     }
 }

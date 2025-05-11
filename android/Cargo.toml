@@ -6,17 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1"                                        # Use anyhow for error handling
-env_logger = "0.11.3"                               # Use env_logger for logging
-chrono = "0.4"                                      # To display the current time
-log = { version = "0.4", default-features = false } # Use log for logging
-slint = { version = "1.8.0", features = ["backend-android-activity-06"] }
+anyhow = "1"                                                               # Use anyhow for error handling
+env_logger = "0.11.3"                                                      # Use env_logger for logging
+chrono = "0.4"                                                             # To display the current time
+log = { version = "0.4", default-features = false }                        # Use log for logging
+slint = { version = "1.10.0", features = ["backend-android-activity-06"] }
 
 # Include the common package as a dependency
-#slint-workshop-common = { path = "../common" }
+slint-workshop-model = { path = "../model" }
 
 [build-dependencies]
-slint-build = "1.8" # To compile slint files into Rust code at compile time
+slint-build = "1.10" # To compile slint files into Rust code at compile time
 
 
 [lib]

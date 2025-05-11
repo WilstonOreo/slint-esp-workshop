@@ -11,10 +11,11 @@ env_logger = "0.11.8"                               # Use env_logger for logging
 chrono = "0.4"                                      # To display the current time
 log = { version = "0.4", default-features = false } # Use log for logging
 
-slint = "1.10" # Use the slint library for the UI
+slint = "1.10"  # Use the slint library for the UI
+rs-wifi = "0.1"
 
-# Include the common package as a dependency
-slint-workshop-common = { path = "../common" }
+# Include the model package as a dependency
+slint-workshop-model = { path = "../model" }
 
 [build-dependencies]
 slint-build = "1.10" # To compile slint files into Rust code at compile time

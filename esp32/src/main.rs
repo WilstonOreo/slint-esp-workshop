@@ -22,7 +22,7 @@ impl App {
     }
 
     /// Run the App
-    fn run(&mut self) -> anyhow::Result<()> {
+    fn run(self) -> anyhow::Result<()> {
         // Run the UI (and map an error to an anyhow::Error).
         self.ui.run().map_err(|e| anyhow::anyhow!(e))
     }
