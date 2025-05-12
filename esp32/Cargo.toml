@@ -49,7 +49,7 @@ sitronix-touch = { version = "0.0.1" }
 eeprom24x = { version = "0.7.2" }
 embedded-hal-bus = { version = "0.3.0", features = ["alloc"] }
 
-slint-workshop-common = { path = "../common" }
+slint-workshop-model = { path = "../model" }
 
 [build-dependencies]
 embuild = "0.33"

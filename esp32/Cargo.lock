@@ -4461,15 +4461,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "slint-workshop-common"
-version = "0.2.0"
-dependencies = [
- "log",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "slint-workshop-esp"
 version = "0.2.0"
 dependencies = [
@@ -4485,7 +4476,16 @@ dependencies = [
  "sitronix-touch",
  "slint",
  "slint-build",
- "slint-workshop-common",
+ "slint-workshop-model",
+]
+
+[[package]]
+name = "slint-workshop-model"
+version = "0.2.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -38,9 +38,10 @@ impl WifiNetworkProvider for Model {
 }
 
 // Dummy data
+#[cfg(not(target_os = "none"))]
 #[cfg(not(target_os = "linux"))]
 impl WifiNetworkProvider for Model {
-    fn wifi_networks() -> Vec<WifiNetwork> {
+    fn scan_wifi_networks(&self) -> Vec<WifiNetwork> {
         vec![
             WifiNetwork {
                 ssid: "Wifi network A".into(),

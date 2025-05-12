@@ -8,8 +8,6 @@ import { WifiNetworkPage } from "pages.slint";
 import { WifiNetwork } from "viewmodel.slint";
 
 export component MainWindow inherits AppWindow {
-    width: 800px;
-    height: 600px;
     in property <[WifiNetwork]> wifi_network_model <=> wifi.model;
 
     callback wifi_refresh;

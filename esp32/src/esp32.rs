@@ -15,7 +15,9 @@ pub struct EspPlatform {
     >,
     window: alloc::rc::Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
     timer: esp_idf_svc::timer::EspTimerService<esp_idf_svc::timer::Task>,
-    pub wifi: esp_idf_svc::wifi::BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>,
+    pub wifi: std::rc::Rc<
+        std::cell::RefCell<esp_idf_svc::wifi::BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>>,
+    >,
 }
 
 impl EspPlatform {
@@ -165,12 +167,14 @@ impl EspPlatform {
         let sys_loop = esp_idf_svc::eventloop::EspSystemEventLoop::take().unwrap();
         let nvs = esp_idf_svc::nvs::EspDefaultNvsPartition::take().unwrap();
 
-        let wifi = esp_idf_svc::wifi::BlockingWifi::wrap(
-            esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs))
-                .unwrap(),
-            sys_loop,
-        )
-        .unwrap();
+        let wifi = std::rc::Rc::new(std::cell::RefCell::new(
+            esp_idf_svc::wifi::BlockingWifi::wrap(
+                esp_idf_svc::wifi::EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs))
+                    .unwrap(),
+                sys_loop,
+            )
+            .unwrap(),
+        ));
 
         std::boxed::Box::new(Self {
             display_width,

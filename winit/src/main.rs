@@ -1,8 +1,6 @@
 // Prevent console window in addition to Slint window in Windows release builds when, e.g., starting the app via file manager. Ignored on other platforms.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::rc::Rc;
-
 use slint_workshop_model::WifiNetworkProvider;
 
 slint::include_modules!();
@@ -21,10 +19,7 @@ impl App {
     fn new() -> anyhow::Result<Self> {
         // Make a new AppWindow
         let ui = MainWindow::new()?;
-
-        let wifi_model = Rc::new(slint::VecModel::<WifiNetwork>::from(vec![WifiNetwork {
-            ssid: "Test".into(),
-        }]));
+        let wifi_model = std::rc::Rc::new(slint::VecModel::<WifiNetwork>::from(vec![]));
 
         Ok(Self {
             ui,
@@ -36,7 +31,6 @@ impl App {
     /// Run the App
     fn run(self) -> anyhow::Result<()> {
         let view_model = self.wifi_model.clone();
-
         self.ui.set_wifi_network_model(view_model.clone().into());
 
         self.ui.on_wifi_refresh(move || {
@@ -53,6 +47,8 @@ impl App {
                     .collect::<Vec<WifiNetwork>>(),
             );
         });
+
+        self.ui.invoke_wifi_refresh();
 
         // Run the UI (and map an error to an anyhow::Error).
         self.ui.run().map_err(|e| e.into())

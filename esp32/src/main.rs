@@ -2,74 +2,83 @@ mod esp32;
 
 slint::include_modules!();
 
-use log::{error, info};
+use log::info;
+
+type Wifi = esp_idf_svc::wifi::BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>;
+
+pub struct Model {
+    wifi: std::rc::Rc<std::cell::RefCell<Wifi>>,
+}
+
+impl slint_workshop_model::WifiNetworkProvider for Model {
+    fn scan_wifi_networks(&self) -> Vec<slint_workshop_model::WifiNetwork> {
+        self.wifi.borrow_mut().start().unwrap();
+        info!("Wifi started");
+
+        self.wifi
+            .borrow_mut()
+            .scan()
+            .unwrap()
+            .iter()
+            .map(|access_point| slint_workshop_model::WifiNetwork {
+                ssid: access_point.ssid.to_string(),
+            })
+            .collect()
+    }
+}
 
 /// Our App struct that holds the UI
 struct App {
     ui: MainWindow,
+    model: Model,
+    wifi_model: std::rc::Rc<slint::VecModel<WifiNetwork>>,
 }
 
 impl App {
     /// Create a new App struct.
     ///
-    /// The App struct initializes the UI and the weather controller.
-    fn new() -> anyhow::Result<Self> {
+    /// The App struct initializes the UI and the Wifi.
+    fn new(wifi: std::rc::Rc<std::cell::RefCell<Wifi>>) -> anyhow::Result<Self> {
         // Make a new MainWindow
         let ui = MainWindow::new().map_err(|e| anyhow::anyhow!(e))?;
+        let wifi_model = std::rc::Rc::new(slint::VecModel::<WifiNetwork>::from(vec![]));
 
         // Return the App struct
-        Ok(Self { ui })
+        Ok(Self {
+            ui,
+            model: Model { wifi },
+            wifi_model,
+        })
     }
 
     /// Run the App
     fn run(self) -> anyhow::Result<()> {
+        use slint_workshop_model::WifiNetworkProvider;
+
+        let view_model = self.wifi_model.clone();
+        self.ui.set_wifi_network_model(view_model.clone().into());
+
+        self.ui.on_wifi_refresh(move || {
+            view_model.set_vec(
+                self.model
+                    .scan_wifi_networks()
+                    .iter()
+                    .map(|wifi| {
+                        println!("{}", wifi.ssid);
+                        WifiNetwork {
+                            ssid: wifi.ssid.clone().into(),
+                        }
+                    })
+                    .collect::<Vec<WifiNetwork>>(),
+            );
+        });
+
+        self.ui.invoke_wifi_refresh();
+
         // Run the UI (and map an error to an anyhow::Error).
         self.ui.run().map_err(|e| anyhow::anyhow!(e))
     }
 }
-
-/*
-fn connect_wifi(
-    wifi: &mut esp_idf_svc::wifi::BlockingWifi<esp_idf_svc::wifi::EspWifi<'static>>,
-) -> anyhow::Result<()> {
-    use embedded_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
-
-    const SSID: &str = env!("WIFI_SSID");
-    const PASSWORD: &str = env!("WIFI_PASS");
-
-    let wifi_configuration: Configuration = Configuration::Client(ClientConfiguration {
-        ssid: SSID.try_into().unwrap(),
-        bssid: None,
-        auth_method: AuthMethod::WPA2Personal,
-        password: PASSWORD.try_into().unwrap(),
-        channel: None,
-        ..Default::default()
-    });
-
-    wifi.set_configuration(&wifi_configuration)?;
-
-    wifi.start()?;
-    info!("Wifi started");
-
-    let access_points = wifi.scan()?;
-    for access_point in access_points {
-        info!("Access point: {}", access_point.ssid);
-    }
-    match wifi.connect() {
-        Ok(_) => {
-            info!("Wifi connected");
-        }
-        Err(e) => {
-            error!("Wifi connection error: {e}");
-        }
-    }
-
-    //wifi.wait_netif_up()?;
-    //info!("Wifi netif up");
-
-    Ok(())
-}
-*/
 
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -79,14 +88,14 @@ fn main() -> anyhow::Result<()> {
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    let mut platform = esp32::EspPlatform::new();
+    let platform = esp32::EspPlatform::new();
 
-    //connect_wifi(&mut platform.wifi)?;
+    let wifi = platform.wifi.clone();
 
     // Set the platform
     slint::platform::set_platform(platform).unwrap();
 
-    let mut app = App::new()?;
+    let app = App::new(wifi.clone())?;
 
     app.run()
 }
