@@ -53,28 +53,6 @@ impl App {
 
     /// Run the App
     fn run(self) -> anyhow::Result<()> {
-        use slint_workshop_model::WifiNetworkProvider;
-
-        let view_model = self.wifi_model.clone();
-        self.ui.set_wifi_network_model(view_model.clone().into());
-
-        self.ui.on_wifi_refresh(move || {
-            view_model.set_vec(
-                self.model
-                    .scan_wifi_networks()
-                    .iter()
-                    .map(|wifi| {
-                        println!("{}", wifi.ssid);
-                        WifiNetwork {
-                            ssid: wifi.ssid.clone().into(),
-                        }
-                    })
-                    .collect::<Vec<WifiNetwork>>(),
-            );
-        });
-
-        self.ui.invoke_wifi_refresh();
-
         // Run the UI (and map an error to an anyhow::Error).
         self.ui.run().map_err(|e| anyhow::anyhow!(e))
     }

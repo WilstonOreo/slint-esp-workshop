@@ -5,26 +5,4 @@ import { ListView, VerticalBox, Button } from "std-widgets.slint";
 
 import { WifiNetwork } from "viewmodel.slint";
 
-export component WifiNetworkPage inherits Page {
-    callback refresh();
-    in property <[WifiNetwork]> model <=> wifi.model;
-
-    Text {
-        text: @tr("{} Wifi Networks", model.length);
-        height: 32px;
-        width: parent.width;
-        horizontal-alignment: center;
-    }
-
-    wifi := WifiNetworkWidget { }
-
-    Button {
-        text: @tr("Refresh wifi");
-        height: 32px;
-        width: parent.width;
-
-        clicked => {
-            root.refresh();
-        }
-    }
-}
+export component WifiNetworkPage inherits Page { }
