@@ -12,18 +12,25 @@ pub struct Model {
 
 impl slint_workshop_model::WifiNetworkProvider for Model {
     fn scan_wifi_networks(&self) -> Vec<slint_workshop_model::WifiNetwork> {
-        self.wifi.borrow_mut().start().unwrap();
-        info!("Wifi started");
+        let mut wifi = self.wifi.borrow_mut();
 
-        self.wifi
-            .borrow_mut()
-            .scan()
-            .unwrap()
-            .iter()
-            .map(|access_point| slint_workshop_model::WifiNetwork {
-                ssid: access_point.ssid.to_string(),
-            })
-            .collect()
+        if let Err(e) = wifi.start() {
+            log::error!("Failed to start WiFi: {:?}", e);
+            return vec![];
+        }
+
+        match wifi.scan() {
+            Ok(aps) => aps
+                .iter()
+                .map(|access_point| slint_workshop_model::WifiNetwork {
+                    ssid: access_point.ssid.to_string(),
+                })
+                .collect(),
+            Err(e) => {
+                log::error!("WiFi scan failed: {:?}", e);
+                vec![]
+            }
+        }
     }
 }
 
