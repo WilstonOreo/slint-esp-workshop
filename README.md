@@ -1,54 +1,111 @@
-# Slint Template for ESoPE board and ESP-IDF
+# Slint Multi-Board Workshop with Bare-Metal Implementation
 
-This is the Rust Slint Template for ESoPE board based on ESP-IDF.
+This is a Rust Slint Workshop template supporting multiple ESP32-S3 boards using a no_std bare-metal implementation.
 
-Clone this template with:
+## Supported Boards
+
+- **ESP32-S3-BOX-3** (default)
+- **ESoPE-SLD-C-W-S3**
+- **ESP32-S3-LCD-EV-BOARD**
+
+## Switching Boards
+
+By default, the workshop is configured for the ESP32-S3-BOX-3. Use different features to build for other boards:
 
 ```sh
-cargo generate https://github.com/WilstonOreo/slint-esp-workshop
-```
+# Default (esp32-s3-box-3)
+cargo run --release
 
-If required, please install `cargo-generate` beforehand:
+# ESoPE board
+cargo run --release --features esope-sld-c-w-s3 --no-default-features
 
-```sh
-cargo install cargo-generate
+# LCD-EV board
+cargo run --release --features esp32-s3-lcd-ev-board --no-default-features
 ```
 
 ## Pre-requisites
 
-- Rust (minimum version 1.80)
-- An IDE, we will use VSCode and the Slint extension for this workshop
+- Rust toolchain (minimum version 1.80)
+- An IDE, such as VSCode, with the Slint extension
 
-### RustRover setup
+To use this template, make sure Rust and the necessary components are installed for no_std ESP32-S3 development:
 
-In RustRover, press *Ctrl+Shift+X* to get into the RustRover Plugins menu and install the Slint plugin from the marketplace.
+```sh
+rustup target add xtensa-esp32s3-none-elf
+cargo install espflash 
+```
 
 ### VSCode setup
 
-Switch to extensions and install the Slint extension.
+Install the Slint extension from the extensions marketplace.
 
 ## Repository structure
 
 - `winit` - Application code for `winit` based platforms, e.g. desktop environments.
-- `esp32` - Application code for ESP32-S3-BOX-3B based on ESP-IDF. This is 
+- `esp32` - **no_std** bare-metal application code for ESP32-S3 boards using esp-hal 1.0.0.beta.1.
 - `ui` - Shared Slint code for the UI.
-- `common` - Crate with shared Rust code for the ESP32 and desktop applications.
+- `model` - Crate with shared Rust code for the ESP32 and desktop applications (no_std compatible).
 
-## Environment setup for `winit`
+## Features
 
-The `winit` build target is located in the `winit` directory.
-No special requirements. Simply install Rust on your system and choose any IDE or text editor you like.
-Do not forget to install the Rust extension for your IDE.
+- **No standard library (no_std)** - Optimized for embedded systems
+- **Multi-board support** - Works with multiple ESP32-S3 development boards
+- **Slint UI framework** - Rich graphics and touch interface
+- **WiFi ready** - Stub implementation ready for WiFi functionality
+- **Embassy async runtime** - Modern async/await support for embedded
 
-## Environment setup for ESoPE
+## Environment Setup for ESP32-S3 (no_std Bare-Metal)
 
-To build, you need to switch into the `esp32` directory, because due to some limitations of the ESP-IDF build system, it cannot be part of the Cargo workspace.
+To build the application for ESP32-S3 boards using no_std bare-metal, switch into the `esp32` directory.
 
-The following steps are required to set up the environment for the ESP32-S3-BOX-3B.
+Make sure to install the required Rust components for the ESP32-S3 target:
 
+```sh
+rustup target add xtensa-esp32s3-none-elf
+```
 
-Follow the prerequisites for
-[esp-idf-template](https://github.com/esp-rs/esp-idf-template?tab=readme-ov-file#prerequisites).
+You should also have `espflash` installed for flashing the device:
+
+```sh
+cargo install espflash
+```
+
+Once set up, build the project:
+
+```sh
+cargo build --release
+```
+
+Flash the application using:
+
+```sh
+cargo espflash --release --chip esp32s3
+```
+
+## No_std Implementation Details
+
+This workshop uses a **no_std** bare-metal implementation, which means:
+
+- **No standard library** - Uses `core` and `alloc` crates only
+- **No heap allocation by default** - Uses PSRAM for dynamic allocation
+- **Direct hardware access** - Through esp-hal crate
+- **No ldproxy required** - Direct compilation to embedded target
+- **Optimized for embedded** - Smaller binary size and better performance
+
+### Key Dependencies
+
+- **esp-hal 1.0.0-beta.1** - Hardware abstraction layer for ESP32-S3
+- **embassy** - Async runtime for embedded systems
+- **slint** - UI framework with no_std support
+- **esp-alloc** - Memory allocator for ESP32 with PSRAM support
+
+### Build Configuration
+
+The project uses:
+- **Target**: `xtensa-esp32s3-none-elf` (bare-metal, no std)
+- **Build std**: `["alloc", "core"]` for no_std with allocation
+- **Custom linker scripts** - For proper memory layout
+- **DMA and PSRAM** - For framebuffer and graphics performance
 
 ### Ubuntu/Debian
 
@@ -65,23 +122,30 @@ sudo apt install wget flex bison gperf cmake ninja-build ccache libffi-dev dfu-u
 
 ```sh
 cargo install espup # ESP toolchain setup
-cargo install ldproxy # A tool to find a suitable linker on the system
 cargo install espflash # Flashing tool
 ```
 
-#### 3. Build and run the project
-
-Change the directory to the root of this repository. 
-You need to set up the ESP toolchain and initialize the environment:
+#### 3. Set up ESP toolchain
 
 ```sh
 espup install # Installs the toolchain. Only has to be done once.
 . ${HOME}/export-esp.sh # This step has to be done for each shell session
 ```
 
-You should now be able to build the project with `cargo build` and run it with `cargo run`.
+#### 4. Build and run the project
 
+Change directory to the `esp32` folder and build the project:
 
+```sh
+cd esp32
+cargo build --release
+```
+
+Flash the application to the device:
+
+```sh
+cargo espflash --release
+```
 
 ### Windows (WSL2)
 
@@ -92,7 +156,6 @@ wsl --install
 ```
 
 Open a new WSL shell and do the following steps:
-
 
 #### 1. Update dependencies 
 
@@ -119,11 +182,9 @@ Install these dependencies required to set up the ESP toolchain:
 
 ```sh
 cargo install espup # ESP toolchain setup
-cargo install ldproxy # A tool to find a suitable linker on the system
 cargo install espflash # Flashing tool
 cargo install cargo-generate # Required to actually check out the template
 ```
-
 
 ####  5. Set up ESP toolchain
 
@@ -135,7 +196,7 @@ espup install # Installs the toolchain. Only has to be done once.
 . ${HOME}/export-esp.sh # This step has to be done for each shell session
 ```
 
-You should now be able to build the project with `cargo build`.
+You should now be able to build the project with `cargo build --release`.
 
 #### 6. Install usbipd for flashing the device
 
@@ -172,4 +233,46 @@ The list in the console output must contain:
 Bus 001 Device 003: ID 303a:1001 Espressif USB JTAG/serial debug unit
 ```
 
-Now, your device can be flashed and you can run your application via `cargo run`.
+Now, your device can be flashed and you can run your application via `cargo espflash --release`.
+
+## Current UI Features
+
+The workshop application includes:
+
+- **Tabbed Interface** - WiFi and About tabs
+- **WiFi Tab** - Shows network list with refresh functionality (stub implementation)
+- **About Tab** - Displays Slint framework information
+- **Touch Support** - Works with capacitive touch displays
+- **Responsive Design** - Adapts to different screen sizes
+
+## Troubleshooting
+
+### I2C EEPROM Errors
+
+If you encounter `I2C(AcknowledgeCheckFailed(Address))` errors with the ESoPE board:
+
+1. **Switch to ESP32-S3-BOX-3** (default) - This board doesn't require EEPROM
+2. **Check hardware connections** - Ensure I2C pins are properly connected
+3. **Verify EEPROM address** - The board might use a different I2C address
+
+### Build Errors
+
+- **Missing target**: Run `rustup target add xtensa-esp32s3-none-elf`
+- **Linker errors**: Make sure ESP toolchain is properly installed with `espup install`
+- **Version conflicts**: Clean build with `cargo clean` and rebuild
+
+### Board Not Detected
+
+- **Check USB connection** - Ensure the board is connected and in download mode
+- **Driver issues** - Install proper USB drivers for your board
+- **Permission issues** - On Linux, you might need to add your user to the `dialout` group
+
+### Next Steps
+
+This workshop is ready for extending with:
+
+- **Real WiFi scanning** - Replace stub implementation with esp-wifi
+- **Network connectivity** - Add TCP/UDP networking
+- **IoT features** - MQTT, HTTP clients, etc.
+- **Advanced UI** - More complex Slint components
+- **Sensors** - Add sensor data display

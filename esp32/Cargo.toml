@@ -6,6 +6,15 @@ edition = "2021"
 resolver = "2"
 rust-version = "1.80"
 
+[features]
+# Default board configuration - change this to switch between boards
+default = ["esp32-s3-box-3"]
+
+# Board-specific features - use with: cargo build --features <board-name> --no-default-features
+esp32-s3-box-3 = ["mcu-board-support/esp32-s3-box-3"]                # ESP32-S3-BOX-3 development board
+esope-sld-c-w-s3 = ["mcu-board-support/esope-sld-c-w-s3"]              # ESoPE-SLD-C-W-S3 board with EEPROM
+esp32-s3-lcd-ev-board = ["mcu-board-support/esp32-s3-lcd-ev-board"]    # ESP32-S3-LCD-EV-BOARD
+
 [profile.release]
 opt-level = "s"
 
@@ -13,47 +22,17 @@ opt-level = "s"
 debug = true    # Symbols are nice and they don't increase the size on Flash
 opt-level = "z"
 
-[features]
-default = ["std", "embassy", "esp-idf-svc/native"]
-
-pio = ["esp-idf-svc/pio"]
-std = ["alloc", "esp-idf-svc/binstart", "esp-idf-svc/std"]
-alloc = ["esp-idf-svc/alloc"]
-nightly = ["esp-idf-svc/nightly"]
-experimental = ["esp-idf-svc/experimental"]
-embassy = [
-    "esp-idf-svc/embassy-sync",
-    "esp-idf-svc/critical-section",
-    "esp-idf-svc/embassy-time-driver",
-]
-
 [dependencies]
-anyhow = "1"
-num-traits = { version = "0.2.16", default-features = false, features = [
-    "libm",
-], optional = true }
 log = { version = "0.4", default-features = false }
-esp-idf-svc = { version = "0.51", default-features = false }
-slint = { version = "1.10", default-features = false, features = [
+
+slint = { path = "../../slint/api/rs/slint", default-features = false, features = [
     "compat-1-2",
     "unsafe-single-threaded",
     "libm",
     "renderer-software",
 ] }
 
-embedded-svc = { version = "0.28", default-features = false }
-
-portable-atomic = { version = "1", features = ["float"] }
-
-sitronix-touch = { version = "0.0.1" }
-eeprom24x = { version = "0.7.2" }
-embedded-hal-bus = { version = "0.3.0", features = ["alloc"] }
-
-slint-workshop-model = { path = "../model" }
+mcu-board-support = { path = "../../slint/examples/mcu-board-support", default-features = false }
 
 [build-dependencies]
-embuild = "0.33"
-slint-build = { version = "1.10", features = ["sdf-fonts"] }
-
-[[package.metadata.esp-idf-sys.extra_components]]
-bindings_header = "bindings.h"
+slint-build = { path = "../../slint/api/rs/build", features = ["sdf-fonts"] }
