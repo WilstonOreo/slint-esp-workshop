@@ -3,10 +3,13 @@
 
 extern crate alloc;
 
+mod wifi_manager;
+
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::panic::PanicInfo;
 use log::info;
+use wifi_manager::WifiManager;
 
 slint::include_modules!();
 
@@ -23,21 +26,36 @@ fn main() {
     
     info!("Starting Slint ESP32-S3 Workshop");
     
-    // Create a simple UI without WiFi functionality for now
+    // Initialize WiFi manager
+    WifiManager::init_with_real_controller();
+    
+    // Create a simple UI
     let ui = MainWindow::new().unwrap();
     
     // Create empty WiFi network model
     let wifi_model = Rc::new(slint::VecModel::<WifiNetwork>::from(Vec::new()));
     ui.set_wifi_network_model(wifi_model.clone().into());
     
-    // Set up a simple refresh handler (without actual WiFi scanning)
+    // Set up WiFi refresh handler that uses the WiFi manager
     ui.on_wifi_refresh(move || {
-        // For now, just add a placeholder entry
-        let mut networks = Vec::new();
-        networks.push(WifiNetwork {
-            ssid: "No WiFi Available".into(),
-        });
-        wifi_model.set_vec(networks);
+        info!("WiFi refresh requested");
+        
+        // Trigger WiFi scan
+        WifiManager::trigger_scan();
+        
+        // Get current scan results
+        let networks = WifiManager::get_scan_results();
+        
+        // Convert to Slint WiFi network format
+        let slint_networks: Vec<WifiNetwork> = networks
+            .iter()
+            .map(|network| WifiNetwork {
+                ssid: network.ssid.clone().into(),
+            })
+            .collect();
+        
+        info!("Updated UI with {} networks", slint_networks.len());
+        wifi_model.set_vec(slint_networks);
     });
     
     // Trigger initial refresh

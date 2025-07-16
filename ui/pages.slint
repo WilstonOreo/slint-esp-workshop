@@ -7,7 +7,7 @@ import { WifiNetwork } from "viewmodel.slint";
 
 export component WifiNetworkPage inherits Page {
     callback refresh();
-    in property <[WifiNetwork]> model <=> wifi.model;
+    in property <[WifiNetwork]> model;
 
     Text {
         text: @tr("{} Wifi Networks", model.length);
@@ -15,8 +15,6 @@ export component WifiNetworkPage inherits Page {
         width: parent.width;
         horizontal-alignment: center;
     }
-
-    wifi := WifiNetworkWidget { }
 
     Button {
         text: @tr("Refresh wifi");
@@ -26,5 +24,11 @@ export component WifiNetworkPage inherits Page {
         clicked => {
             root.refresh();
         }
+    }
+
+    wifi := WifiNetworkWidget {
+        model: root.model;
+        // Set explicit height to leave space for header and button
+        height: parent.height - 80px;
     }
 }

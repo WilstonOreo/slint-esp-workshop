@@ -7,7 +7,7 @@ import { WifiNetworkPage } from "../ui/pages.slint";
 import { WifiNetwork } from "../ui/viewmodel.slint";
 
 export component MainWindow inherits AppWindow {
-    in property <[WifiNetwork]> wifi_network_model <=> wifi.model;
+    in property <[WifiNetwork]> wifi_network_model;
 
     callback wifi_refresh;
     
@@ -20,6 +20,7 @@ export component MainWindow inherits AppWindow {
             title: @tr("Wifi");
 
             wifi := WifiNetworkPage {
+                model: root.wifi_network_model;
                 refresh => {
                     root.wifi_refresh();
                 }
