@@ -3,13 +3,14 @@
 
 extern crate alloc;
 
-mod wifi_manager;
-
 use alloc::rc::Rc;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::panic::PanicInfo;
 use log::info;
-use wifi_manager::WifiManager;
+
+use esp_alloc as _;
+use esp_backtrace as _;
 
 slint::include_modules!();
 
@@ -19,43 +20,43 @@ fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
 
-#[no_mangle]
-fn main() {
-    // Initialize the MCU board support
+
+#[esp_hal_embassy::main]
+async fn main(_spawner: embassy_executor::Spawner) {
+    // Initialize the MCU board support first (this initializes hal, logger, and heap)
     mcu_board_support::init();
     
     info!("Starting Slint ESP32-S3 Workshop");
     
-    // Initialize WiFi manager
-    WifiManager::init_with_real_controller();
+    // For now, let's create a simple fallback that doesn't require WiFi
+    info!("WiFi functionality temporarily disabled due to initialization order");
     
     // Create a simple UI
     let ui = MainWindow::new().unwrap();
     
-    // Create empty WiFi network model
-    let wifi_model = Rc::new(slint::VecModel::<WifiNetwork>::from(Vec::new()));
+    // Create empty WiFi network model with some placeholder data
+    let placeholder_networks = vec![
+        WifiNetwork { ssid: "WiFi Disabled".into() },
+        WifiNetwork { ssid: "Please check code".into() },
+        WifiNetwork { ssid: "for WiFi integration".into() },
+    ];
+    
+    let wifi_model = Rc::new(slint::VecModel::<WifiNetwork>::from(placeholder_networks));
     ui.set_wifi_network_model(wifi_model.clone().into());
     
-    // Set up WiFi refresh handler that uses the WiFi manager
+    // Set up WiFi refresh handler with placeholder functionality
     ui.on_wifi_refresh(move || {
-        info!("WiFi refresh requested");
+        info!("WiFi refresh requested - showing placeholder data");
         
-        // Trigger WiFi scan
-        WifiManager::trigger_scan();
+        // Show placeholder networks
+        let placeholder_networks = vec![
+            WifiNetwork { ssid: "Network 1".into() },
+            WifiNetwork { ssid: "Network 2".into() },
+            WifiNetwork { ssid: "Network 3".into() },
+        ];
         
-        // Get current scan results
-        let networks = WifiManager::get_scan_results();
-        
-        // Convert to Slint WiFi network format
-        let slint_networks: Vec<WifiNetwork> = networks
-            .iter()
-            .map(|network| WifiNetwork {
-                ssid: network.ssid.clone().into(),
-            })
-            .collect();
-        
-        info!("Updated UI with {} networks", slint_networks.len());
-        wifi_model.set_vec(slint_networks);
+        info!("Updated UI with {} placeholder networks", placeholder_networks.len());
+        wifi_model.set_vec(placeholder_networks);
     });
     
     // Trigger initial refresh
