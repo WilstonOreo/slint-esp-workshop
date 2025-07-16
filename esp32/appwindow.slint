@@ -1,45 +1,35 @@
 /// The Base class is imported as Window from widgets.slint.
-import { AppWindow, WifiNetworkWidget } from "../ui/widgets.slint";
+import { AppWindow } from "../ui/widgets.slint";
+
+import { Switch, TabWidget, AboutSlint } from "std-widgets.slint";
+import { WifiNetworkPage } from "../ui/pages.slint";
+
 import { WifiNetwork } from "../ui/viewmodel.slint";
 
-import { TabWidget, Slider, HorizontalBox, Switch, Button } from "std-widgets.slint";
-
 export component MainWindow inherits AppWindow {
-    in-out property <[WifiNetwork]> wifi_network_model;
-    callback wifi_refresh();
+    in property <[WifiNetwork]> wifi_network_model <=> wifi.model;
+
+    callback wifi_refresh;
     
-    VerticalLayout {
-        Text {
-            text: "Welcome to the Slint Workshop";
-            horizontal-alignment: center;
-        }
+    public function invoke_wifi_refresh() {
+        self.wifi_refresh();
+    }
 
-        Text {
-            text: "Screen resolution: \{root.width * 1phx / 1px / 1phx} x \{root.height * 1phx / 1px / 1phx}";
-            horizontal-alignment: center;
-        }
+    TabWidget {
+        Tab {
+            title: @tr("Wifi");
 
-        HorizontalBox {
-            Text {
-                text: "WiFi Networks:";
-                horizontal-alignment: left;
-            }
-            
-            Button {
-                text: "Refresh";
-                clicked => {
+            wifi := WifiNetworkPage {
+                refresh => {
                     root.wifi_refresh();
                 }
             }
         }
-        
-        WifiNetworkWidget {
-            model: root.wifi_network_model;
-            height: 200px;
-        }
 
-        Switch {
-            text: "This is a switch";
+        Tab {
+            title: @tr("About");
+
+            AboutSlint { }
         }
     }
 }
