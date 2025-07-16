@@ -11,6 +11,10 @@ export component MainWindow inherits AppWindow {
     in property <[WifiNetwork]> wifi_network_model <=> wifi.model;
 
     callback wifi_refresh;
+    
+    public function invoke_wifi_refresh() {
+        self.wifi_refresh();
+    }
 
     TabWidget {
         Tab {

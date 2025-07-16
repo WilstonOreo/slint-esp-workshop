@@ -33,6 +33,10 @@ slint = { path = "../../slint/api/rs/slint", default-features = false, features 
 ] }
 
 mcu-board-support = { path = "../../slint/examples/mcu-board-support", default-features = false }
+esp-println = { version = "0.13.1", features = ["esp32s3", "log"] }
+
+# Explicitly enable esp32s3 feature for xtensa-lx-rt to resolve version conflict
+xtensa-lx-rt = { version = "0.19.0", features = ["esp32s3"] }
 
 [build-dependencies]
 slint-build = { path = "../../slint/api/rs/build", features = ["sdf-fonts"] }
