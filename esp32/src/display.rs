@@ -93,11 +93,12 @@ impl EspDisplay {
             }
         }
 
-        // Set window size from display
+        // Set window size from display - CRITICAL: This must be done!
         if let Some(window) = self.window.borrow().clone() {
             let size = hardware.display.size();
             let size = slint::PhysicalSize::new(size.width, size.height);
-            window.set_size(slint::WindowSize::Physical(size));
+            info!("Setting window size to: {}x{}", size.width, size.height);
+            window.set_size(size);  // Use direct size, not WindowSize::Physical
         }
 
         loop {
@@ -123,15 +124,15 @@ impl EspDisplay {
                             }
                         };
 
-                        let _ = window.dispatch_event(event);
+                        window.dispatch_event(event);
                     }
                     Ok(None) => {
                         if let Some(pos) = last_touch.take() {
-                            let _ = window.dispatch_event(WindowEvent::PointerReleased {
+                            window.dispatch_event(WindowEvent::PointerReleased {
                                 position: pos,
                                 button: PointerEventButton::Left,
                             });
-                            let _ = window.dispatch_event(WindowEvent::PointerExited);
+                            window.dispatch_event(WindowEvent::PointerExited);
                         }
                     }
                     Err(_) => {
@@ -221,7 +222,7 @@ pub fn init_display_hardware(
     delay.delay_ms(50);  // Additional delay
     delay.delay_ms(100); // Even more delay for touch controller
 
-    // SPI and Display initialization
+    // SPI and Display initialization following working reference
     let spi = Spi::<Blocking>::new(
         spi2,
         SpiConfig::default()
@@ -233,7 +234,7 @@ pub fn init_display_hardware(
     .with_mosi(gpio6);
 
     let dc = Output::new(gpio4, Level::Low, OutputConfig::default());
-    let cs = Output::new(gpio5, Level::High, OutputConfig::default());
+    let cs = Output::new(gpio5, Level::Low, OutputConfig::default());
 
     let spi_delay = Delay::new();
     let spi_device =
@@ -249,9 +250,8 @@ pub fn init_display_hardware(
 
     let mut display = mipidsi::Builder::new(mipidsi::models::ILI9486Rgb565, di)
         .reset_pin(rst)
-        .display_size(320, 240)
-        .color_order(ColorOrder::Bgr)
         .orientation(mipidsi::options::Orientation::new().rotate(mipidsi::options::Rotation::Deg180))
+        .color_order(ColorOrder::Bgr)
         .init(&mut display_delay)
         .map_err(|_| "Failed to initialize display")?;
 

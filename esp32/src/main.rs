@@ -59,7 +59,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     
     // Initialize BOTH heap allocators - WiFi first in internal RAM, then PSRAM for GUI
     // Step 1: Initialize internal RAM heap for WiFi (must be first)
-    esp_alloc::heap_allocator!(size: 120 * 1024);
+    esp_alloc::heap_allocator!(size: 180 * 1024);
     
     // Step 2: Initialize PSRAM heap for GUI and other data
     init_heap(&peripherals.PSRAM);
@@ -153,13 +153,9 @@ async fn main(spawner: embassy_executor::Spawner) {
     // Trigger initial refresh
     ui.invoke_wifi_refresh();
 
-    // For now, we need to integrate the event loop with ui.run()
-    // The proper integration will be done after we fix the current approach
-
-    // TODO: Integrate the hardware event loop with Slint's UI event loop
-    // For now, just run the UI to show it works
+    // Use the platform's event loop instead of ui.run() to enable hardware rendering
     info!("Starting UI event loop - board ready for user interaction");
-    ui.run().unwrap();
+    slint::run_event_loop().unwrap();
 }
 
 // WiFi scanning task
