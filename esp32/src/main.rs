@@ -5,6 +5,7 @@ extern crate alloc;
 
 mod display;
 
+use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec;
 use core::panic::PanicInfo;
@@ -17,12 +18,40 @@ use esp_hal::{rng::Rng, timer::timg::TimerGroup};
 use esp_println::logger::init_logger_from_env;
 use esp_wifi::{
     EspWifiController,
-    wifi::{ClientConfiguration, Configuration, WifiController},
+    wifi::{ClientConfiguration, Configuration, WifiController, AccessPointInfo},
 };
 use embassy_time::{Duration, Timer};
 use alloc::string::String;
+use core::sync::atomic::{AtomicBool, Ordering};
+use embassy_sync::mutex::Mutex;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 
 slint::include_modules!();
+
+// Shared state for WiFi scan results
+static WIFI_SCAN_RESULTS: Mutex<CriticalSectionRawMutex, alloc::vec::Vec<AccessPointInfo>> = Mutex::new(alloc::vec::Vec::new());
+static WIFI_SCAN_UPDATED: AtomicBool = AtomicBool::new(false);
+
+// Custom Slint backend for Embassy integration
+struct EspEmbassyBackend {
+    window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
+}
+
+impl EspEmbassyBackend {
+    fn new(window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>) -> Self {
+        Self { window }
+    }
+}
+
+impl slint::platform::Platform for EspEmbassyBackend {
+    fn create_window_adapter(&self) -> Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError> {
+        Ok(self.window.clone())
+    }
+
+    fn duration_since_start(&self) -> core::time::Duration {
+        embassy_time::Instant::now().duration_since(embassy_time::Instant::from_secs(0)).into()
+    }
+}
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
@@ -84,13 +113,13 @@ async fn main(spawner: embassy_executor::Spawner) {
     let (wifi_controller, _interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).expect("Failed to create WiFi interface");
     info!("WiFi interface created");
     
-    // Initialize display platform
-    display::init().expect("Failed to initialize display platform");
-    
-    // Initialize embassy timer for task scheduling
+    // Initialize embassy timer for task scheduling BEFORE spawning tasks
     use esp_hal::timer::systimer::SystemTimer;
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     esp_hal_embassy::init(systimer.alarm0);
+    info!("Embassy timer initialized");
+    
+    // Don't initialize the standard display platform - we'll use a custom one
     
     // Initialize display hardware with specific peripherals
     display::init_display_hardware(
@@ -107,9 +136,19 @@ async fn main(spawner: embassy_executor::Spawner) {
         peripherals.I2C0,
     ).expect("Failed to initialize display hardware");
     
-    // Start WiFi scanning task
-    spawner.spawn(wifi_scan_task(wifi_controller)).ok();
+    // Store WiFi controller for the render loop task
+    let wifi_ctrl = wifi_controller;
     
+    // Create custom Slint window and backend
+    let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(
+        slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
+    );
+    window.set_size(slint::PhysicalSize::new(320, 240));
+    
+    let backend = Box::new(EspEmbassyBackend::new(window.clone()));
+    slint::platform::set_platform(backend).expect("backend already initialized");
+    info!("Custom Slint backend initialized");
+
     // Initial liveness check
     info!("System initialization complete - board is alive and ready");
     // Create the UI
@@ -130,41 +169,125 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // Set up WiFi refresh handler with real WiFi functionality
     ui.on_wifi_refresh(move || {
-        info!("WiFi refresh requested - scanning for networks");
-
-        // TODO: Implement actual WiFi scanning here
-        // For now, show placeholder networks
-        let placeholder_networks = vec![
-            WifiNetwork {
-                ssid: "Network 1".into(),
-            },
-            WifiNetwork {
-                ssid: "Network 2".into(),
-            },
-            WifiNetwork {
-                ssid: "Network 3".into(),
-            },
-        ];
-
-        info!("Updated UI with {} networks", placeholder_networks.len());
-        wifi_model.set_vec(placeholder_networks);
+        info!("WiFi refresh requested - checking for scan results");
+        
+        // Check if we have new scan results
+        if WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
+            // Access the scan results
+            let scan_results = WIFI_SCAN_RESULTS.try_lock();
+            if let Ok(results) = scan_results {
+                let mut networks = alloc::vec::Vec::new();
+                
+                for ap in results.iter() {
+                    networks.push(WifiNetwork {
+                        ssid: ap.ssid.as_str().into(),
+                    });
+                }
+                
+                if networks.is_empty() {
+                    networks.push(WifiNetwork {
+                        ssid: "No networks found".into(),
+                    });
+                }
+                
+                info!("Updated UI with {} real networks", networks.len());
+                wifi_model.set_vec(networks);
+                
+                // Reset the update flag
+                WIFI_SCAN_UPDATED.store(false, Ordering::Relaxed);
+            } else {
+                info!("Could not access scan results (locked)");
+            }
+        } else {
+            info!("No new scan results available");
+        }
     });
 
     // Trigger initial refresh
     ui.invoke_wifi_refresh();
 
-    // Use the platform's event loop instead of ui.run() to enable hardware rendering
-    info!("Starting UI event loop - board ready for user interaction");
-    slint::run_event_loop().unwrap();
+    // Spawn WiFi scanning task
+    info!("Spawning WiFi scan task");
+    spawner.spawn(wifi_scan_task(wifi_ctrl)).ok();
+    
+    // Spawn render loop task
+    info!("Spawning render loop task");
+    spawner.spawn(render_loop_task(window)).ok();
+    
+    // Keep the main task alive
+    loop {
+        embassy_time::Timer::after(embassy_time::Duration::from_secs(1)).await;
+    }
+}
+
+// Render loop task for Embassy integration
+#[embassy_executor::task]
+async fn render_loop_task(window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>) {
+    info!("=== Render loop task started ====");
+    
+    loop {
+        // Update timers and animations
+        slint::platform::update_timers_and_animations();
+        
+        // Handle touch input and rendering
+        if let Some(display_hardware) = unsafe { display::DISPLAY_COMPONENTS.as_mut() } {
+            // Handle touch input
+            let mut last_touch = None;
+            match display_hardware.touch.get_touch(&mut display_hardware.i2c) {
+                Ok(Some(point)) => {
+                    let pos = slint::PhysicalPosition::new(point.x as i32, point.y as i32)
+                        .to_logical(window.scale_factor());
+                    
+                    let event = if let Some(previous_pos) = last_touch.replace(pos) {
+                        if previous_pos != pos {
+                            slint::platform::WindowEvent::PointerMoved { position: pos }
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        slint::platform::WindowEvent::PointerPressed {
+                            position: pos,
+                            button: slint::platform::PointerEventButton::Left,
+                        }
+                    };
+                    
+                    window.dispatch_event(event);
+                }
+                Ok(None) => {
+                    if let Some(pos) = last_touch.take() {
+                        window.dispatch_event(slint::platform::WindowEvent::PointerReleased {
+                            position: pos,
+                            button: slint::platform::PointerEventButton::Left,
+                        });
+                        window.dispatch_event(slint::platform::WindowEvent::PointerExited);
+                    }
+                }
+                Err(_) => {
+                    // Ignore touch errors
+                }
+            }
+            
+            // Render if needed
+            window.draw_if_needed(|renderer| {
+                let mut buffer_provider = display::HardwareDrawBuffer {
+                    display: &mut display_hardware.display,
+                    buffer: &mut [slint::platform::software_renderer::Rgb565Pixel(0); 320],
+                };
+                renderer.render_by_line(&mut buffer_provider);
+            });
+        }
+        
+        // Small delay to prevent busy waiting
+        embassy_time::Timer::after(embassy_time::Duration::from_millis(16)).await; // ~60fps
+    }
 }
 
 // WiFi scanning task
 #[embassy_executor::task]
 async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
-    info!("Starting WiFi scan task");
-    info!("Device capabilities: {:?}", wifi_controller.capabilities());
+    info!("=== WiFi scan task started ====");
     
-    // Set up the WiFi controller in station mode
+    // Start WiFi
     let client_config = Configuration::Client(ClientConfiguration {
         ssid: String::new(),
         password: String::new(),
@@ -173,30 +296,21 @@ async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
     
     match wifi_controller.set_configuration(&client_config) {
         Ok(_) => info!("WiFi configuration set successfully"),
-        Err(e) => {
-            info!("Failed to set WiFi configuration: {:?}", e);
-            return;
-        }
+        Err(e) => info!("Failed to set WiFi configuration: {:?}", e),
     }
     
-    // Start WiFi
-    info!("Starting WiFi...");
     match wifi_controller.start_async().await {
         Ok(_) => info!("WiFi started successfully!"),
-        Err(e) => {
-            info!("Failed to start WiFi: {:?}", e);
-            return;
-        }
+        Err(e) => info!("Failed to start WiFi: {:?}", e),
     }
     
     // Wait a bit for WiFi to initialize
-    Timer::after(Duration::from_secs(2)).await;
+    embassy_time::Timer::after(embassy_time::Duration::from_secs(2)).await;
     
     loop {
         info!("Performing WiFi scan...");
         
-        // Perform a scan for up to 16 networks
-        match wifi_controller.scan_n_async(16).await {
+        match wifi_controller.scan_n_async(10).await {
             Ok(results) => {
                 info!("Found {} networks:", results.len());
                 for (i, ap) in results.iter().enumerate() {
@@ -210,8 +324,15 @@ async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
                     );
                 }
                 
-                // TODO: Update UI model with scan results
-                // This requires a channel or shared state mechanism
+                // Store scan results in shared state
+                if let Ok(mut scan_results) = WIFI_SCAN_RESULTS.try_lock() {
+                    scan_results.clear();
+                    scan_results.extend_from_slice(&results);
+                    WIFI_SCAN_UPDATED.store(true, Ordering::Relaxed);
+                    info!("Stored {} scan results for UI", scan_results.len());
+                } else {
+                    info!("Could not store scan results (mutex locked)");
+                }
             }
             Err(e) => {
                 info!("WiFi scan failed: {:?}", e);
@@ -219,7 +340,7 @@ async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
         }
         
         // Wait 10 seconds before next scan
-        info!("Board is alive - next scan in 10 seconds");
-        Timer::after(Duration::from_secs(10)).await;
+        embassy_time::Timer::after(embassy_time::Duration::from_secs(10)).await;
     }
 }
+

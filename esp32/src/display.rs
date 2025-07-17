@@ -28,10 +28,10 @@ use slint::platform::PointerEventButton;
 use slint::platform::WindowEvent;
 
 // Global storage for display components
-static mut DISPLAY_COMPONENTS: Option<DisplayHardware> = None;
+pub static mut DISPLAY_COMPONENTS: Option<DisplayHardware> = None;
 
-struct DisplayHardware {
-    display: mipidsi::Display<
+pub struct DisplayHardware {
+    pub display: mipidsi::Display<
         mipidsi::interface::SpiInterface<
             'static,
             ExclusiveDevice<Spi<'static, esp_hal::Blocking>, Output<'static>, Delay>,
@@ -40,8 +40,8 @@ struct DisplayHardware {
         mipidsi::models::ILI9486Rgb565,
         Output<'static>,
     >,
-    touch: Gt911Blocking<I2c<'static, esp_hal::Blocking>>,
-    i2c: I2c<'static, esp_hal::Blocking>,
+    pub touch: Gt911Blocking<I2c<'static, esp_hal::Blocking>>,
+    pub i2c: I2c<'static, esp_hal::Blocking>,
 }
 
 struct EspDisplay {
@@ -437,9 +437,9 @@ impl<
 }
 
 /// Hardware draw buffer that renders directly to the display
-struct HardwareDrawBuffer<'a, Display> {
-    display: &'a mut Display,
-    buffer: &'a mut [slint::platform::software_renderer::Rgb565Pixel],
+pub struct HardwareDrawBuffer<'a, Display> {
+    pub display: &'a mut Display,
+    pub buffer: &'a mut [slint::platform::software_renderer::Rgb565Pixel],
 }
 
 impl<
