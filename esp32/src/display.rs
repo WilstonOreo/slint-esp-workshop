@@ -98,7 +98,7 @@ impl EspDisplay {
             let size = hardware.display.size();
             let size = slint::PhysicalSize::new(size.width, size.height);
             info!("Setting window size to: {}x{}", size.width, size.height);
-            window.set_size(size);  // Use direct size, not WindowSize::Physical
+            window.set_size(size); // Use direct size, not WindowSize::Physical
         }
 
         loop {
@@ -157,7 +157,7 @@ impl EspDisplay {
             // Small delay to prevent busy waiting
             let mut delay = Delay::new();
             delay.delay_ms(10);
-            
+
             // Liveness check - log every 500 iterations (approximately every 5 seconds)
             liveness_counter += 1;
             if liveness_counter % 500 == 0 {
@@ -277,7 +277,9 @@ pub fn init_display_hardware(
 
     let mut display = mipidsi::Builder::new(mipidsi::models::ILI9486Rgb565, di)
         .reset_pin(rst)
-        .orientation(mipidsi::options::Orientation::new().rotate(mipidsi::options::Rotation::Deg180))
+        .orientation(
+            mipidsi::options::Orientation::new().rotate(mipidsi::options::Rotation::Deg180),
+        )
         .color_order(ColorOrder::Bgr)
         .init(&mut display_delay)
         .map_err(|_| "Failed to initialize display")?;
@@ -292,41 +294,41 @@ pub fn init_display_hardware(
         .map_err(|_| "Failed to clear display")?;
 
     // I2C initialization for touch
-let mut i2c = I2c::new(
-    i2c0,
-    esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
-)
-.map_err(|_| "Failed to create I2C")?
-.with_sda(gpio8)
-.with_scl(gpio18);
+    let mut i2c = I2c::new(
+        i2c0,
+        esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
+    )
+    .map_err(|_| "Failed to create I2C")?
+    .with_sda(gpio8)
+    .with_scl(gpio18);
 
-info!("Attempting to initialize touch at primary address 0x14");
-let mut touch = Gt911Blocking::new(0x14);
+    info!("Attempting to initialize touch at primary address 0x14");
+    let mut touch = Gt911Blocking::new(0x14);
 
-match touch.init(&mut i2c) {
-    Ok(_) => info!("Touch initialized at primary address"),
-    Err(e) => {
-        warn!("Touch initialization failed at primary address: {:?}", e);
-        info!("Attempting to initialize touch at backup address 0x5D");
-        let mut touch_fallback = Gt911Blocking::new(0x5D);
-        match touch_fallback.init(&mut i2c) {
-            Ok(_) => {
-                info!("Touch initialized at backup address");
-                touch = touch_fallback;
+    match touch.init(&mut i2c) {
+        Ok(_) => info!("Touch initialized at primary address"),
+        Err(e) => {
+            warn!("Touch initialization failed at primary address: {:?}", e);
+            info!("Attempting to initialize touch at backup address 0x5D");
+            let mut touch_fallback = Gt911Blocking::new(0x5D);
+            match touch_fallback.init(&mut i2c) {
+                Ok(_) => {
+                    info!("Touch initialized at backup address");
+                    touch = touch_fallback;
+                }
+                Err(e) => error!("Touch initialization failed at backup address: {:?}", e),
             }
-            Err(e) => error!("Touch initialization failed at backup address: {:?}", e),
         }
     }
-}
 
-// Store components globally for the platform to use
-unsafe {
-    DISPLAY_COMPONENTS = Some(DisplayHardware {
-        display,
-        touch,
-        i2c,
-    });
-}
+    // Store components globally for the platform to use
+    unsafe {
+        DISPLAY_COMPONENTS = Some(DisplayHardware {
+            display,
+            touch,
+            i2c,
+        });
+    }
 
     info!("Display hardware initialization complete");
     Ok(())

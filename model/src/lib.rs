@@ -1,3 +1,8 @@
+#![no_std]
+
+extern crate alloc;
+use alloc::{string::String, vec::Vec};
+
 /// Simple Struct for storing WiFi Network data.
 pub struct WifiNetwork {
     pub ssid: String,
@@ -15,6 +20,10 @@ pub struct Model;
 #[cfg(target_os = "linux")]
 impl WifiNetworkProvider for Model {
     fn scan_wifi_networks(&self) -> Vec<WifiNetwork> {
+        // For Linux, we need std for process execution
+        extern crate std;
+        use alloc::vec;
+        
         String::from_utf8(
             std::process::Command::new("nmcli")
                 .arg("-t")
@@ -37,17 +46,18 @@ impl WifiNetworkProvider for Model {
     }
 }
 
-// Dummy data
-#[cfg(not(target_os = "none"))]
+// ESP32 or other embedded targets
 #[cfg(not(target_os = "linux"))]
 impl WifiNetworkProvider for Model {
     fn scan_wifi_networks(&self) -> Vec<WifiNetwork> {
+        use alloc::vec;
+        
         vec![
             WifiNetwork {
-                ssid: "Wifi network A".into(),
+                ssid: "ESP32 Network A".into(),
             },
             WifiNetwork {
-                ssid: "Wifi network B".into(),
+                ssid: "ESP32 Network B".into(),
             },
         ]
     }
