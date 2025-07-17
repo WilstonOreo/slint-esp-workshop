@@ -225,6 +225,9 @@ async fn main(spawner: embassy_executor::Spawner) {
 async fn render_loop_task(window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>, ui: slint::Weak<MainWindow>) {
     info!("=== Render loop task started ====");
     
+    // Touch state tracking - move outside the loop
+    let mut last_touch = None;
+    
     loop {
         // Update timers and animations
         slint::platform::update_timers_and_animations();
@@ -240,7 +243,6 @@ async fn render_loop_task(window: Rc<slint::platform::software_renderer::Minimal
         // Handle touch input and rendering
         if let Some(display_hardware) = unsafe { display::DISPLAY_COMPONENTS.as_mut() } {
             // Handle touch input
-            let mut last_touch = None;
             match display_hardware.touch.get_touch(&mut display_hardware.i2c) {
                 Ok(Some(point)) => {
                     let pos = slint::PhysicalPosition::new(point.x as i32, point.y as i32)
@@ -248,11 +250,13 @@ async fn render_loop_task(window: Rc<slint::platform::software_renderer::Minimal
                     
                     let event = if let Some(previous_pos) = last_touch.replace(pos) {
                         if previous_pos != pos {
+                            info!("Touch moved: {:?} -> {:?}", previous_pos, pos);
                             slint::platform::WindowEvent::PointerMoved { position: pos }
                         } else {
                             continue;
                         }
                     } else {
+                        info!("Touch pressed at: {:?}", pos);
                         slint::platform::WindowEvent::PointerPressed {
                             position: pos,
                             button: slint::platform::PointerEventButton::Left,
@@ -263,6 +267,7 @@ async fn render_loop_task(window: Rc<slint::platform::software_renderer::Minimal
                 }
                 Ok(None) => {
                     if let Some(pos) = last_touch.take() {
+                        info!("Touch released at: {:?}", pos);
                         window.dispatch_event(slint::platform::WindowEvent::PointerReleased {
                             position: pos,
                             button: slint::platform::PointerEventButton::Left,
@@ -271,7 +276,7 @@ async fn render_loop_task(window: Rc<slint::platform::software_renderer::Minimal
                     }
                 }
                 Err(_) => {
-                    // Ignore touch errors
+                    // Ignore touch errors silently to avoid spam
                 }
             }
             

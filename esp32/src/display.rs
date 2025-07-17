@@ -196,31 +196,58 @@ pub fn init_display_hardware(
 ) -> Result<(), &'static str> {
     let mut delay = Delay::new();
 
-    // Touch initialization sequence for GT911
-    // Need proper timing for touch controller to initialize
-    let _reset_level = Level::Low;
-    let mut int_pin = Output::new(gpio3, Level::High, OutputConfig::default());
-    int_pin.set_low();
-    delay.delay_ms(20);  // Increased delay
-    int_pin.set_low();
-    delay.delay_ms(5);   // Increased delay
+    // The following sequence is necessary to properly initialize touch on ESP32-S3-BOX-3
+    // Based on issue from ESP-IDF: https://github.com/espressif/esp-bsp/issues/302#issuecomment-1971559689
+    // Related code: https://github.com/espressif/esp-bsp/blob/30f0111a97b8fbe2efb7e58366fcf4d26b380f23/components/lcd_touch/esp_lcd_touch_gt911/esp_lcd_touch_gt911.c#L101-L133
+    // --- Begin GT911 I²C Address Selection Sequence ---
+    // Define constants for the two possible addresses.
+    const ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS: u8 = 0x14;
+    const ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP: u8 = 0x5D;
 
-    // Reset pin: OpenDrain required for ESP32-S3-BOX-3
-    let rst = Output::new(
+    // Our desired address.
+    const DESIRED_ADDR: u8 = 0x14;
+    // For desired address 0x14, assume the configuration's reset level is false (i.e. 0 means active).
+    let reset_level = Level::Low;
+
+    // Configure the INT pin (GPIO3) as output; starting high because of internal pull-up.
+    let mut int_pin = Output::new(gpio3, Level::High, OutputConfig::default());
+    // Force INT low to prepare for address selection.
+    int_pin.set_low();
+    delay.delay_ms(10);
+    int_pin.set_low();
+    delay.delay_ms(1);
+
+    // Configure the shared RESET pin (GPIO48) as output in open–drain mode.
+    let mut rst = Output::new(
         gpio48,
-        Level::High,
+        Level::Low, // start in active state
         OutputConfig::default().with_drive_mode(DriveMode::OpenDrain),
     );
 
+    // Set RESET to the reset-active level (here, false).
+    rst.set_level(reset_level);
+    // (Ensure INT remains low.)
     int_pin.set_low();
-    delay.delay_ms(20);  // Increased delay
+    delay.delay_ms(10);
 
-    let gpio_level = Level::Low; // For address 0x14
+    // Now, select the I²C address:
+    // For GT911 address 0x14, the desired INT level is low; otherwise, for backup (0x5D) it would be high.
+    let gpio_level = if DESIRED_ADDR == ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS {
+        Level::Low
+    } else if DESIRED_ADDR == ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP {
+        Level::High
+    } else {
+        Level::Low
+    };
     int_pin.set_level(gpio_level);
-    delay.delay_ms(10);  // Increased delay
+    delay.delay_ms(1);
 
-    delay.delay_ms(50);  // Additional delay
-    delay.delay_ms(100); // Even more delay for touch controller
+    // Toggle the RESET pin:
+    // Release RESET by setting it to the opposite of the reset level.
+    rst.set_level(!reset_level);
+    delay.delay_ms(10);
+    delay.delay_ms(50);
+    // --- End GT911 I²C Address Selection Sequence ---
 
     // SPI and Display initialization following working reference
     let spi = Spi::<Blocking>::new(
@@ -265,27 +292,41 @@ pub fn init_display_hardware(
         .map_err(|_| "Failed to clear display")?;
 
     // I2C initialization for touch
-    // Give touch controller more time to initialize
-    delay.delay_ms(200);
-    
-    let i2c = I2c::new(
-        i2c0,
-        esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)), // Slower I2C for better reliability
-    )
-    .map_err(|_| "Failed to create I2C")?
-    .with_sda(gpio8)
-    .with_scl(gpio18);
+let mut i2c = I2c::new(
+    i2c0,
+    esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
+)
+.map_err(|_| "Failed to create I2C")?
+.with_sda(gpio8)
+.with_scl(gpio18);
 
-    let touch = Gt911Blocking::new(0x14);
+info!("Attempting to initialize touch at primary address 0x14");
+let mut touch = Gt911Blocking::new(0x14);
 
-    // Store components globally for the platform to use
-    unsafe {
-        DISPLAY_COMPONENTS = Some(DisplayHardware {
-            display,
-            touch,
-            i2c,
-        });
+match touch.init(&mut i2c) {
+    Ok(_) => info!("Touch initialized at primary address"),
+    Err(e) => {
+        warn!("Touch initialization failed at primary address: {:?}", e);
+        info!("Attempting to initialize touch at backup address 0x5D");
+        let mut touch_fallback = Gt911Blocking::new(0x5D);
+        match touch_fallback.init(&mut i2c) {
+            Ok(_) => {
+                info!("Touch initialized at backup address");
+                touch = touch_fallback;
+            }
+            Err(e) => error!("Touch initialization failed at backup address: {:?}", e),
+        }
     }
+}
+
+// Store components globally for the platform to use
+unsafe {
+    DISPLAY_COMPONENTS = Some(DisplayHardware {
+        display,
+        touch,
+        i2c,
+    });
+}
 
     info!("Display hardware initialization complete");
     Ok(())
