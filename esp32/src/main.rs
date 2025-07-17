@@ -212,7 +212,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     
     // Spawn render loop task
     info!("Spawning render loop task");
-    spawner.spawn(render_loop_task(window)).ok();
+    spawner.spawn(render_loop_task(window, ui.as_weak())).ok();
     
     // Keep the main task alive
     loop {
@@ -222,12 +222,20 @@ async fn main(spawner: embassy_executor::Spawner) {
 
 // Render loop task for Embassy integration
 #[embassy_executor::task]
-async fn render_loop_task(window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>) {
+async fn render_loop_task(window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>, ui: slint::Weak<MainWindow>) {
     info!("=== Render loop task started ====");
     
     loop {
         // Update timers and animations
         slint::platform::update_timers_and_animations();
+        
+        // Check for new WiFi scan results and trigger UI refresh if available
+        if WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
+            if let Some(ui_strong) = ui.upgrade() {
+                ui_strong.invoke_wifi_refresh();
+                info!("Triggered UI refresh for new WiFi scan results");
+            }
+        }
         
         // Handle touch input and rendering
         if let Some(display_hardware) = unsafe { display::DISPLAY_COMPONENTS.as_mut() } {
