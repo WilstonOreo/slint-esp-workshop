@@ -4,9 +4,7 @@ members = ["winit", "model"]
 exclude = ["esp32", "ui", "wasm", "android"]
 
 [workspace.package]
-name = "slint-workshop"
 version = "0.2.0"
 authors = ["Michael Winkelmann <michael@winkelmann.site>"]
-edition = "2021"
-resolver = "2"
-rust-version = "1.80"
+edition = "2024"
+rust-version = "1.85"

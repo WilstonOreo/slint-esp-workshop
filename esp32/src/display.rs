@@ -3,15 +3,11 @@
 // Uses the approach from esp32-conways-game-of-life-rs and esp32-spooky-maze-game
 
 use alloc::boxed::Box;
-use alloc::rc::Rc;
-use core::cell::RefCell;
-use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
 use embedded_hal::delay::DelayNs;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_hal::gpio::DriveMode;
-use esp_hal::time::Instant;
 use esp_hal::{
     delay::Delay,
     gpio::{Level, Output, OutputConfig},
@@ -24,11 +20,43 @@ use esp_hal::{
 use gt911::Gt911Blocking;
 use log::{error, info, warn};
 use mipidsi::options::ColorOrder;
-use slint::platform::PointerEventButton;
-use slint::platform::WindowEvent;
 
-// Global storage for display components
-pub static mut DISPLAY_COMPONENTS: Option<DisplayHardware> = None;
+// Global storage for display components - using a safer approach
+use core::cell::UnsafeCell;
+
+pub struct DisplayComponentsContainer {
+    inner: UnsafeCell<Option<DisplayHardware>>,
+}
+
+// Safe wrapper for accessing display components
+impl DisplayComponentsContainer {
+    const fn new() -> Self {
+        Self {
+            inner: UnsafeCell::new(None),
+        }
+    }
+
+    fn set(&self, hardware: DisplayHardware) {
+        unsafe {
+            *self.inner.get() = Some(hardware);
+        }
+    }
+
+    pub fn with_mut<R>(&self, f: impl FnOnce(&mut DisplayHardware) -> R) -> Option<R> {
+        unsafe {
+            if let Some(ref mut hardware) = *self.inner.get() {
+                Some(f(hardware))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+// SAFETY: This is only safe because we're in a single-threaded embedded environment
+unsafe impl Sync for DisplayComponentsContainer {}
+
+pub static DISPLAY_COMPONENTS: DisplayComponentsContainer = DisplayComponentsContainer::new();
 
 pub struct DisplayHardware {
     pub display: mipidsi::Display<
@@ -44,143 +72,8 @@ pub struct DisplayHardware {
     pub i2c: I2c<'static, esp_hal::Blocking>,
 }
 
-struct EspDisplay {
-    window: RefCell<Option<Rc<slint::platform::software_renderer::MinimalSoftwareWindow>>>,
-}
-
-impl slint::platform::Platform for EspDisplay {
-    fn create_window_adapter(
-        &self,
-    ) -> Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError> {
-        let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(
-            slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
-        );
-        self.window.replace(Some(window.clone()));
-        Ok(window)
-    }
-
-    fn duration_since_start(&self) -> core::time::Duration {
-        core::time::Duration::from_millis(Instant::now().duration_since_epoch().as_millis())
-    }
-
-    fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
-        self.run_event_loop_impl()
-    }
-}
-
-impl EspDisplay {
-    fn run_event_loop_impl(&self) -> Result<(), slint::PlatformError> {
-        // Use the actual hardware for rendering and touch input
-        let mut last_touch = None;
-        let mut liveness_counter = 0u32;
-
-        // Initialize touch with fallback
-        let hardware = unsafe { DISPLAY_COMPONENTS.as_mut().unwrap() };
-
-        const ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP: u8 = 0x5D;
-        match hardware.touch.init(&mut hardware.i2c) {
-            Ok(_) => info!("Touch initialized"),
-            Err(e) => {
-                warn!("Touch initialization failed: {:?}", e);
-                let touch_fallback = Gt911Blocking::new(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP);
-                match touch_fallback.init(&mut hardware.i2c) {
-                    Ok(_) => {
-                        info!("Touch initialized with backup address");
-                        hardware.touch = touch_fallback;
-                    }
-                    Err(e) => error!("Touch initialization failed with backup address: {:?}", e),
-                }
-            }
-        }
-
-        // Set window size from display - CRITICAL: This must be done!
-        if let Some(window) = self.window.borrow().clone() {
-            let size = hardware.display.size();
-            let size = slint::PhysicalSize::new(size.width, size.height);
-            info!("Setting window size to: {}x{}", size.width, size.height);
-            window.set_size(size); // Use direct size, not WindowSize::Physical
-        }
-
-        loop {
-            slint::platform::update_timers_and_animations();
-
-            if let Some(window) = self.window.borrow().clone() {
-                // Handle touch input
-                match hardware.touch.get_touch(&mut hardware.i2c) {
-                    Ok(Some(point)) => {
-                        let pos = slint::PhysicalPosition::new(point.x as i32, point.y as i32)
-                            .to_logical(window.scale_factor());
-
-                        let event = if let Some(previous_pos) = last_touch.replace(pos) {
-                            if previous_pos != pos {
-                                WindowEvent::PointerMoved { position: pos }
-                            } else {
-                                continue;
-                            }
-                        } else {
-                            WindowEvent::PointerPressed {
-                                position: pos,
-                                button: PointerEventButton::Left,
-                            }
-                        };
-
-                        window.dispatch_event(event);
-                    }
-                    Ok(None) => {
-                        if let Some(pos) = last_touch.take() {
-                            window.dispatch_event(WindowEvent::PointerReleased {
-                                position: pos,
-                                button: PointerEventButton::Left,
-                            });
-                            window.dispatch_event(WindowEvent::PointerExited);
-                        }
-                    }
-                    Err(_) => {
-                        // Ignore touch errors
-                    }
-                }
-
-                // Render with actual display hardware
-                window.draw_if_needed(|renderer| {
-                    let mut buffer_provider = HardwareDrawBuffer {
-                        display: &mut hardware.display,
-                        buffer: &mut [slint::platform::software_renderer::Rgb565Pixel(0); 320],
-                    };
-                    renderer.render_by_line(&mut buffer_provider);
-                });
-
-                if window.has_active_animations() {
-                    continue;
-                }
-            }
-
-            // Small delay to prevent busy waiting
-            let mut delay = Delay::new();
-            delay.delay_ms(10);
-
-            // Liveness check - log every 500 iterations (approximately every 5 seconds)
-            liveness_counter += 1;
-            if liveness_counter % 500 == 0 {
-                info!("UI event loop alive - iteration {}", liveness_counter);
-            }
-        }
-    }
-}
-
-/// Initialize the display platform using the approach from working examples
-pub fn init() -> Result<(), &'static str> {
-    // Set up Slint platform
-    slint::platform::set_platform(Box::new(EspDisplay {
-        window: RefCell::new(None),
-    }))
-    .map_err(|_| "Failed to set Slint platform")?;
-
-    info!("Display platform initialized");
-    Ok(())
-}
-
 /// Initialize the display hardware directly in main
-/// This follows the approach from esp32-conways-game-of-life-rs  
+/// This follows the approach from esp32-conways-game-of-life-rs
 pub fn init_display_hardware(
     gpio3: esp_hal::peripherals::GPIO3<'static>,
     gpio4: esp_hal::peripherals::GPIO4<'static>,
@@ -310,7 +203,7 @@ pub fn init_display_hardware(
         Err(e) => {
             warn!("Touch initialization failed at primary address: {:?}", e);
             info!("Attempting to initialize touch at backup address 0x5D");
-            let mut touch_fallback = Gt911Blocking::new(0x5D);
+            let touch_fallback = Gt911Blocking::new(0x5D);
             match touch_fallback.init(&mut i2c) {
                 Ok(_) => {
                     info!("Touch initialized at backup address");
@@ -322,123 +215,14 @@ pub fn init_display_hardware(
     }
 
     // Store components globally for the platform to use
-    unsafe {
-        DISPLAY_COMPONENTS = Some(DisplayHardware {
-            display,
-            touch,
-            i2c,
-        });
-    }
+    DISPLAY_COMPONENTS.set(DisplayHardware {
+        display,
+        touch,
+        i2c,
+    });
 
     info!("Display hardware initialization complete");
     Ok(())
-}
-
-/// Run the complete event loop with hardware display and touch
-/// This integrates the display with Slint's rendering system
-pub fn run_with_hardware(
-    mut display: mipidsi::Display<
-        mipidsi::interface::SpiInterface<
-            'static,
-            ExclusiveDevice<Spi<'static, esp_hal::Blocking>, Output<'static>, Delay>,
-            Output<'static>,
-        >,
-        mipidsi::models::ILI9486Rgb565,
-        Output<'static>,
-    >,
-    mut touch: Gt911Blocking<I2c<'static, esp_hal::Blocking>>,
-    mut i2c: I2c<'static, esp_hal::Blocking>,
-    window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
-) -> Result<(), slint::PlatformError> {
-    // Initialize touch with fallback
-    const ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS: u8 = 0x14;
-    const ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP: u8 = 0x5D;
-
-    match touch.init(&mut i2c) {
-        Ok(_) => info!("Touch initialized"),
-        Err(e) => {
-            warn!("Touch initialization failed: {:?}", e);
-            let touch_fallback = Gt911Blocking::new(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP);
-            match touch_fallback.init(&mut i2c) {
-                Ok(_) => {
-                    info!("Touch initialized with backup address");
-                    touch = touch_fallback;
-                }
-                Err(e) => error!("Touch initialization failed with backup address: {:?}", e),
-            }
-        }
-    }
-
-    // Update the Slint window size from the display
-    let size = display.size();
-    let size = slint::PhysicalSize::new(size.width, size.height);
-    window.set_size(slint::WindowSize::Physical(size));
-
-    // Prepare a draw buffer for the Slint software renderer
-    let mut buffer_provider = DrawBuffer {
-        display: &mut display,
-        buffer: &mut [slint::platform::software_renderer::Rgb565Pixel(0); 320],
-    };
-
-    // Variable to track the last touch position
-    let mut last_touch = None;
-
-    // Main event loop
-    loop {
-        slint::platform::update_timers_and_animations();
-
-        // Poll the GT911 for touch data
-        match touch.get_touch(&mut i2c) {
-            // Active touch detected: Some(point) means a press or move
-            Ok(Some(point)) => {
-                // Convert GT911 raw coordinates into a PhysicalPosition
-                let pos = slint::PhysicalPosition::new(point.x as i32, point.y as i32)
-                    .to_logical(window.scale_factor());
-
-                let event = if let Some(previous_pos) = last_touch.replace(pos) {
-                    // If the position changed, send a PointerMoved event
-                    if previous_pos != pos {
-                        WindowEvent::PointerMoved { position: pos }
-                    } else {
-                        // If the position is unchanged, skip event generation
-                        continue;
-                    }
-                } else {
-                    // No previous touch recorded, generate a PointerPressed event
-                    WindowEvent::PointerPressed {
-                        position: pos,
-                        button: PointerEventButton::Left,
-                    }
-                };
-
-                // Dispatch the event to Slint
-                let _ = window.dispatch_event(event);
-            }
-            // No active touch: if a previous touch existed, dispatch pointer release
-            Ok(None) => {
-                if let Some(pos) = last_touch.take() {
-                    let _ = window.dispatch_event(WindowEvent::PointerReleased {
-                        position: pos,
-                        button: PointerEventButton::Left,
-                    });
-                    let _ = window.dispatch_event(WindowEvent::PointerExited);
-                }
-            }
-            // On errors, ignore them
-            Err(_) => {
-                // Optionally log errors
-            }
-        }
-
-        // Render the window if needed
-        window.draw_if_needed(|renderer| {
-            renderer.render_by_line(&mut buffer_provider);
-        });
-
-        if window.has_active_animations() {
-            continue;
-        }
-    }
 }
 
 /// Provides a draw buffer for the MinimalSoftwareWindow renderer

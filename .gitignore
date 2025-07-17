@@ -1,7 +1,7 @@
 /.vscode
 /.embuild
 /target
-/Cargo.lock
+Cargo.lock
 /esp32/target
 /esp32/.embuild
 /wasm/target

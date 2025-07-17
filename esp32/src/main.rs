@@ -15,7 +15,7 @@ use alloc::string::String;
 use core::sync::atomic::{AtomicBool, Ordering};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
-use embassy_time::{Duration, Timer};
+use embassy_time;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
@@ -254,7 +254,7 @@ async fn render_loop_task(
         }
 
         // Handle touch input and rendering
-        if let Some(display_hardware) = unsafe { display::DISPLAY_COMPONENTS.as_mut() } {
+        display::DISPLAY_COMPONENTS.with_mut(|display_hardware| {
             // Handle touch input
             match display_hardware.touch.get_touch(&mut display_hardware.i2c) {
                 Ok(Some(point)) => {
@@ -264,19 +264,21 @@ async fn render_loop_task(
                     let event = if let Some(previous_pos) = last_touch.replace(pos) {
                         if previous_pos != pos {
                             info!("Touch moved: {:?} -> {:?}", previous_pos, pos);
-                            slint::platform::WindowEvent::PointerMoved { position: pos }
+                            Some(slint::platform::WindowEvent::PointerMoved { position: pos })
                         } else {
-                            continue;
+                            None
                         }
                     } else {
                         info!("Touch pressed at: {:?}", pos);
-                        slint::platform::WindowEvent::PointerPressed {
+                        Some(slint::platform::WindowEvent::PointerPressed {
                             position: pos,
                             button: slint::platform::PointerEventButton::Left,
-                        }
+                        })
                     };
 
-                    window.dispatch_event(event);
+                    if let Some(event) = event {
+                        window.dispatch_event(event);
+                    }
                 }
                 Ok(None) => {
                     if let Some(pos) = last_touch.take() {
@@ -301,7 +303,7 @@ async fn render_loop_task(
                 };
                 renderer.render_by_line(&mut buffer_provider);
             });
-        }
+        });
 
         // Small delay to prevent busy waiting
         embassy_time::Timer::after(embassy_time::Duration::from_millis(16)).await;
