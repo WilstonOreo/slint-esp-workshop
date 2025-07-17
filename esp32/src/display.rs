@@ -72,6 +72,7 @@ impl EspDisplay {
     fn run_event_loop_impl(&self) -> Result<(), slint::PlatformError> {
         // Use the actual hardware for rendering and touch input
         let mut last_touch = None;
+        let mut liveness_counter = 0u32;
 
         // Initialize touch with fallback
         let hardware = unsafe { DISPLAY_COMPONENTS.as_mut().unwrap() };
@@ -155,6 +156,12 @@ impl EspDisplay {
             // Small delay to prevent busy waiting
             let mut delay = Delay::new();
             delay.delay_ms(10);
+            
+            // Liveness check - log every 500 iterations (approximately every 5 seconds)
+            liveness_counter += 1;
+            if liveness_counter % 500 == 0 {
+                info!("UI event loop alive - iteration {}", liveness_counter);
+            }
         }
     }
 }

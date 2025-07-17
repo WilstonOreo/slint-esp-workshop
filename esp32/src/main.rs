@@ -109,6 +109,9 @@ async fn main(spawner: embassy_executor::Spawner) {
     
     // Start WiFi scanning task
     spawner.spawn(wifi_scan_task(wifi_controller)).ok();
+    
+    // Initial liveness check
+    info!("System initialization complete - board is alive and ready");
     // Create the UI
     let ui = MainWindow::new().unwrap();
 
@@ -155,6 +158,7 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // TODO: Integrate the hardware event loop with Slint's UI event loop
     // For now, just run the UI to show it works
+    info!("Starting UI event loop - board ready for user interaction");
     ui.run().unwrap();
 }
 
@@ -219,7 +223,7 @@ async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
         }
         
         // Wait 10 seconds before next scan
-        info!("Waiting 10 seconds before next scan...");
+        info!("Board is alive - next scan in 10 seconds");
         Timer::after(Duration::from_secs(10)).await;
     }
 }
