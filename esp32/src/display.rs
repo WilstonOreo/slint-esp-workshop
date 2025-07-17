@@ -174,48 +174,59 @@ pub fn init() -> Result<(), &'static str> {
 /// Initialize the display hardware directly in main
 /// This follows the approach from esp32-conways-game-of-life-rs  
 pub fn init_display_hardware(
-    peripherals: esp_hal::peripherals::Peripherals,
+    gpio3: esp_hal::peripherals::GPIO3<'static>,
+    gpio4: esp_hal::peripherals::GPIO4<'static>,
+    gpio5: esp_hal::peripherals::GPIO5<'static>,
+    gpio6: esp_hal::peripherals::GPIO6<'static>,
+    gpio7: esp_hal::peripherals::GPIO7<'static>,
+    gpio8: esp_hal::peripherals::GPIO8<'static>,
+    gpio18: esp_hal::peripherals::GPIO18<'static>,
+    gpio47: esp_hal::peripherals::GPIO47<'static>,
+    gpio48: esp_hal::peripherals::GPIO48<'static>,
+    spi2: esp_hal::peripherals::SPI2<'static>,
+    i2c0: esp_hal::peripherals::I2C0<'static>,
 ) -> Result<(), &'static str> {
     let mut delay = Delay::new();
 
     // Touch initialization sequence for GT911
+    // Need proper timing for touch controller to initialize
     let _reset_level = Level::Low;
-    let mut int_pin = Output::new(peripherals.GPIO3, Level::High, OutputConfig::default());
+    let mut int_pin = Output::new(gpio3, Level::High, OutputConfig::default());
     int_pin.set_low();
-    delay.delay_ms(10);
+    delay.delay_ms(20);  // Increased delay
     int_pin.set_low();
-    delay.delay_ms(1);
+    delay.delay_ms(5);   // Increased delay
 
     // Reset pin: OpenDrain required for ESP32-S3-BOX-3
     let rst = Output::new(
-        peripherals.GPIO48,
+        gpio48,
         Level::High,
         OutputConfig::default().with_drive_mode(DriveMode::OpenDrain),
     );
 
     int_pin.set_low();
-    delay.delay_ms(10);
+    delay.delay_ms(20);  // Increased delay
 
     let gpio_level = Level::Low; // For address 0x14
     int_pin.set_level(gpio_level);
-    delay.delay_ms(1);
+    delay.delay_ms(10);  // Increased delay
 
-    delay.delay_ms(10);
-    delay.delay_ms(50);
+    delay.delay_ms(50);  // Additional delay
+    delay.delay_ms(100); // Even more delay for touch controller
 
     // SPI and Display initialization
     let spi = Spi::<Blocking>::new(
-        peripherals.SPI2,
+        spi2,
         SpiConfig::default()
             .with_frequency(Rate::from_mhz(40))
             .with_mode(SpiMode::_0),
     )
     .map_err(|_| "Failed to create SPI")?
-    .with_sck(peripherals.GPIO7)
-    .with_mosi(peripherals.GPIO6);
+    .with_sck(gpio7)
+    .with_mosi(gpio6);
 
-    let dc = Output::new(peripherals.GPIO4, Level::Low, OutputConfig::default());
-    let cs = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
+    let dc = Output::new(gpio4, Level::Low, OutputConfig::default());
+    let cs = Output::new(gpio5, Level::High, OutputConfig::default());
 
     let spi_delay = Delay::new();
     let spi_device =
@@ -233,11 +244,12 @@ pub fn init_display_hardware(
         .reset_pin(rst)
         .display_size(320, 240)
         .color_order(ColorOrder::Bgr)
+        .orientation(mipidsi::options::Orientation::new().rotate(mipidsi::options::Rotation::Deg180))
         .init(&mut display_delay)
         .map_err(|_| "Failed to initialize display")?;
 
     // Set up the backlight
-    let mut backlight = Output::new(peripherals.GPIO47, Level::Low, OutputConfig::default());
+    let mut backlight = Output::new(gpio47, Level::Low, OutputConfig::default());
     backlight.set_high();
 
     // Clear the display to show it's working
@@ -246,13 +258,16 @@ pub fn init_display_hardware(
         .map_err(|_| "Failed to clear display")?;
 
     // I2C initialization for touch
+    // Give touch controller more time to initialize
+    delay.delay_ms(200);
+    
     let i2c = I2c::new(
-        peripherals.I2C0,
-        esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
+        i2c0,
+        esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)), // Slower I2C for better reliability
     )
     .map_err(|_| "Failed to create I2C")?
-    .with_sda(peripherals.GPIO8)
-    .with_scl(peripherals.GPIO18);
+    .with_sda(gpio8)
+    .with_scl(gpio18);
 
     let touch = Gt911Blocking::new(0x14);
 
