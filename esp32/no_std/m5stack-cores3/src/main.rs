@@ -3,6 +3,8 @@
 
 extern crate alloc;
 
+mod display;
+
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
@@ -14,7 +16,6 @@ use log::{debug, error, info};
 use core::sync::atomic::{AtomicBool, Ordering};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
-use embassy_sync::signal::Signal;
 use embassy_time::{Duration, Ticker};
 use esp_hal::rng::Rng;
 use esp_wifi::EspWifiController;
@@ -24,28 +25,17 @@ use esp_wifi::wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiCo
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
-use esp_hal::gpio::{Level, Output, OutputConfig};
 use esp_hal::i2c::master::I2c;
-use esp_hal::peripherals::Peripherals;
-use esp_hal::spi::Mode as SpiMode;
-use esp_hal::spi::master::{Config as SpiConfig, Spi};
-// use esp_hal::system::Stack; // Commented out as multicore not currently used
-use esp_hal::time::{Instant, Rate};
-use esp_hal::timer::{AnyTimer, timg::TimerGroup};
-use esp_hal_embassy::Executor;
+use esp_hal::time::Rate;
+use esp_hal::timer::timg::TimerGroup;
 use esp_println::logger::init_logger_from_env;
-use static_cell::StaticCell;
 
 // Display imports
-use embedded_graphics_core::draw_target::DrawTarget;
-use embedded_graphics_core::pixelcolor::{Rgb565, RgbColor};
+use display::{DISPLAY_COMPONENTS, HardwareDrawBuffer};
 use embedded_hal::delay::DelayNs;
-use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_hal::delay::Delay;
-use mipidsi::options::ColorOrder;
 
 // Slint platform imports
-use slint::PhysicalSize;
 use slint::platform::software_renderer::Rgb565Pixel;
 
 slint::include_modules!();
@@ -65,15 +55,6 @@ const LCD_BUFFER_SIZE: usize = LCD_H_RES_USIZE * LCD_V_RES_USIZE;
 // I2C device addresses for M5Stack CoreS3 power management
 const AXP2101_ADDRESS: u8 = 0x34; // AXP2101 power management IC
 const AW9523_I2C_ADDRESS: u8 = 0x58; // AW9523 GPIO expander
-
-// Signals for coordination between cores
-static PSRAM_READY: Signal<CriticalSectionRawMutex, ()> = Signal::new();
-// Note: Multicore support not currently used, but keeping framework for future
-// static mut APP_CORE_STACK: Stack<4096> = Stack::new();
-// static DMA_READY: Signal<CriticalSectionRawMutex, ()> = Signal::new();
-// static FRAME_READY: Signal<CriticalSectionRawMutex, ()> = Signal::new();
-static mut PSRAM_BUF_PTR: *mut u8 = core::ptr::null_mut();
-static mut PSRAM_BUF_LEN: usize = 0;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -218,183 +199,6 @@ where
     Ok(())
 }
 
-struct EspBackend {
-    window:
-        core::cell::RefCell<Option<Rc<slint::platform::software_renderer::MinimalSoftwareWindow>>>,
-    peripherals: core::cell::RefCell<Option<Peripherals>>,
-}
-
-impl Default for EspBackend {
-    fn default() -> Self {
-        EspBackend {
-            window: core::cell::RefCell::new(None),
-            peripherals: core::cell::RefCell::new(None),
-        }
-    }
-}
-
-impl slint::platform::Platform for EspBackend {
-    fn create_window_adapter(
-        &self,
-    ) -> Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError> {
-        let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(
-            slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
-        );
-        self.window.replace(Some(window.clone()));
-        Ok(window)
-    }
-
-    fn duration_since_start(&self) -> core::time::Duration {
-        core::time::Duration::from_millis(Instant::now().duration_since_epoch().as_millis())
-    }
-
-    fn run_event_loop(&self) -> Result<(), slint::PlatformError> {
-        info!("=== Starting M5Stack CoreS3 Event Loop ===");
-        let heap_at_start = esp_alloc::HEAP.used();
-        info!("Heap usage at event loop start: {} bytes", heap_at_start);
-
-        let peripherals = self
-            .peripherals
-            .borrow_mut()
-            .take()
-            .expect("Peripherals already taken");
-
-        // M5Stack CoreS3 Display Setup (much simpler than ESoPE!)
-        info!("Setting up M5Stack CoreS3 display...");
-
-        // Enable panel power/backlight (GPIO48 for M5Stack CoreS3)
-        let mut backlight = Output::new(peripherals.GPIO48, Level::Low, OutputConfig::default());
-        backlight.set_high();
-        info!("M5Stack CoreS3 backlight enabled");
-
-        // SPI Display setup for M5Stack CoreS3 (ILI9341)
-        let spi = Spi::new(
-            peripherals.SPI2,
-            SpiConfig::default()
-                .with_frequency(Rate::from_mhz(40))
-                .with_mode(SpiMode::_0),
-        )
-        .unwrap()
-        .with_sck(peripherals.GPIO36) // M5Stack CoreS3 SPI CLK
-        .with_mosi(peripherals.GPIO37); // M5Stack CoreS3 SPI MOSI
-
-        let dc = Output::new(peripherals.GPIO35, Level::Low, OutputConfig::default()); // M5Stack CoreS3 DC
-        let cs = Output::new(peripherals.GPIO3, Level::High, OutputConfig::default()); // M5Stack CoreS3 CS  
-        let rst = Output::new(peripherals.GPIO34, Level::High, OutputConfig::default()); // M5Stack CoreS3 RST
-
-        let spi_delay = Delay::new();
-        let spi_device = ExclusiveDevice::new(spi, cs, spi_delay).unwrap();
-
-        // Create static buffer using heap (much simpler than ESoPE EEPROM setup!)
-        let buffer: &'static mut [u8; 512] = Box::leak(Box::new([0_u8; 512]));
-        let di = mipidsi::interface::SpiInterface::new(spi_device, dc, buffer);
-
-        let mut display_delay = Delay::new();
-        display_delay.delay_ns(500_000u32);
-
-        // Initialize ILI9341 display (M5Stack CoreS3's display controller)
-        let mut _display = mipidsi::Builder::new(mipidsi::models::ILI9341Rgb565, di)
-            .reset_pin(rst)
-            .orientation(
-                mipidsi::options::Orientation::new().rotate(mipidsi::options::Rotation::Deg0),
-            )
-            .color_order(ColorOrder::Rgb)
-            .init(&mut display_delay)
-            .unwrap();
-
-        info!("M5Stack CoreS3 display initialized");
-
-        // Clear the display to show it's working
-        _display.clear(Rgb565::GREEN).unwrap();
-        info!("M5Stack CoreS3 display cleared to green");
-
-        // Tell Slint the window dimensions match the display resolution
-        let size = PhysicalSize::new(LCD_H_RES.into(), LCD_V_RES.into());
-        self.window
-            .borrow()
-            .as_ref()
-            .expect("Window adapter not created")
-            .set_size(size);
-
-        // Allocate framebuffer in PSRAM with 64-byte alignment for DMA
-        const FRAME_BYTES: usize = LCD_BUFFER_SIZE * 2;
-
-        let layout = alloc::alloc::Layout::from_size_align(FRAME_BYTES, 64)
-            .expect("Failed to create layout for framebuffer");
-        let fb_ptr = unsafe { alloc::alloc::alloc(layout) };
-
-        if fb_ptr.is_null() {
-            alloc::alloc::handle_alloc_error(layout);
-        }
-
-        // Initialize the buffer
-        let fb_slice = unsafe { core::slice::from_raw_parts_mut(fb_ptr, FRAME_BYTES) };
-        let rgb565_slice =
-            unsafe { core::slice::from_raw_parts_mut(fb_ptr as *mut Rgb565, LCD_BUFFER_SIZE) };
-
-        // Fill with blue color to show PSRAM is working
-        for pixel in rgb565_slice.iter_mut() {
-            *pixel = Rgb565::BLUE;
-        }
-
-        let psram_buf: &'static mut [u8] = fb_slice;
-
-        // Verify PSRAM buffer allocation and alignment
-        let buf_ptr = psram_buf.as_ptr() as usize;
-        info!("PSRAM buffer allocated at address: 0x{:08X}", buf_ptr);
-        info!("PSRAM buffer length: {}", psram_buf.len());
-        info!("PSRAM buffer alignment modulo 64: {}", buf_ptr % 64);
-        assert!(
-            buf_ptr % 64 == 0,
-            "PSRAM buffer must be 64-byte aligned for DMA"
-        );
-
-        // Publish PSRAM buffer pointer and len for app core
-        unsafe {
-            PSRAM_BUF_PTR = psram_buf.as_mut_ptr();
-            PSRAM_BUF_LEN = psram_buf.len();
-        }
-
-        // Initialize Embassy with both timers for multicore support
-        info!("=== Embassy Initialization ===");
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let timer0: AnyTimer = timg0.timer0.into();
-        let timg1 = TimerGroup::new(peripherals.TIMG1);
-        let timer1: AnyTimer = timg1.timer0.into();
-
-        info!("Initializing Embassy with dual timers for multicore support...");
-        esp_hal_embassy::init([timer0, timer1]);
-
-        // Signal that PSRAM is ready for the app core
-        info!("Signaling PSRAM ready for app core...");
-        PSRAM_READY.signal(());
-
-        // For now, skip complex multicore DMA setup and just run Slint on main core
-        info!("=== Main Core Executor Setup ===");
-        static MAIN_EXECUTOR: StaticCell<Executor> = StaticCell::new();
-        let executor = MAIN_EXECUTOR.init(Executor::new());
-        info!("Main core executor initialized on Core 0");
-
-        let window = self
-            .window
-            .borrow()
-            .as_ref()
-            .expect("Window not created")
-            .clone();
-
-        executor.run(|spawner| {
-            match spawner.spawn(slint_main_task(window)) {
-                Ok(_) => info!("Slint main task spawned successfully on Core 0"),
-                Err(e) => error!("Failed to spawn Slint main task: {:?}", e),
-            }
-
-            info!("=== M5Stack CoreS3 main executor loop starting ===");
-        });
-
-        Ok(())
-    }
-}
-
 struct EspEmbassyBackend {
     window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
 }
@@ -450,180 +254,81 @@ async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
 }
 */
 
+// Graphics rendering task - handles display output
 #[embassy_executor::task]
-async fn slint_main_task(window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>) {
-    info!("[Slint] Main task starting, waiting for PSRAM ready signal...");
-
-    // Wait for PSRAM to be ready
-    PSRAM_READY.wait().await;
-    info!("[Slint] PSRAM ready signal received!");
-
-    // Get the PSRAM buffer
-    let psram_ptr = unsafe { PSRAM_BUF_PTR };
-    let psram_len = unsafe { PSRAM_BUF_LEN };
-
-    if psram_ptr.is_null() || psram_len == 0 {
-        error!(
-            "[Slint] Invalid PSRAM buffer: ptr=0x{:08X}, len={}",
-            psram_ptr as usize, psram_len
-        );
-        return;
-    }
-
-    let _fb_slice: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(psram_ptr, psram_len) };
-
-    info!(
-        "[Slint] Slint task started, PSRAM buffer at: 0x{:08X}, len: {}",
-        psram_ptr as usize, psram_len
-    );
-
-    // Create pixel buffer for Slint rendering in PSRAM
-    info!("[Slint] Creating pixel buffer in PSRAM...");
-    let mut pixel_box: Box<[Rgb565Pixel; LCD_BUFFER_SIZE]> =
-        Box::new([Rgb565Pixel(0); LCD_BUFFER_SIZE]);
-    let pixel_buf: &mut [Rgb565Pixel] = &mut *pixel_box;
-    info!(
-        "[Slint] Pixel buffer created in PSRAM, {} pixels",
-        LCD_BUFFER_SIZE
-    );
-
-    // Initialize WiFi
-    info!("[Slint] Initializing WiFi...");
-
-    // We need to get fresh peripherals for WiFi - this is a simplified approach
-    // In a real implementation, we'd pass the WiFi controller from the main thread
-    // For now, let's create the UI without WiFi scanning to test the display
-
-    // Create the UI
-    let ui = MainWindow::new().unwrap();
-    info!("[Slint] UI created");
-
-    // Create empty WiFi network model with placeholder data
-    let placeholder_networks = vec![
-        WifiNetwork {
-            ssid: "M5Stack CoreS3 Ready!".into(),
-        },
-        WifiNetwork {
-            ssid: "Display Working!".into(),
-        },
-    ];
-
-    let wifi_model = Rc::new(slint::VecModel::<WifiNetwork>::from(placeholder_networks));
-    ui.set_wifi_network_model(wifi_model.clone().into());
-
-    // Set up WiFi refresh handler
-    ui.on_wifi_refresh({
-        let wifi_model = wifi_model.clone();
-        move || {
-            info!("[Slint] WiFi refresh requested");
-
-            // Check if we have new scan results
-            if WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
-                // For now, just show a success message
-                let networks = vec![WifiNetwork {
-                    ssid: "Scan feature coming soon!".into(),
-                }];
-
-                wifi_model.set_vec(networks);
-                WIFI_SCAN_UPDATED.store(false, Ordering::Relaxed);
-            } else {
-                // Show scanning message
-                let networks = vec![WifiNetwork {
-                    ssid: "Scanning...".into(),
-                }];
-                wifi_model.set_vec(networks);
-            }
-        }
-    });
-
-    let mut ticker = Ticker::every(Duration::from_millis(200));
-    let mut frame_counter = 0u32;
-
-    info!("[Slint] Entering main rendering loop...");
-
-    loop {
-        // Update Slint timers and animations
-        slint::platform::update_timers_and_animations();
-
-        // Render the frame
-        let rendered = window.draw_if_needed(|renderer| {
-            renderer.render(pixel_buf, LCD_H_RES as usize);
-
-            if frame_counter % 60 == 0 {
-                debug!("[Slint] Frame {} rendered by Slint", frame_counter);
-            }
-        });
-
-        if rendered && frame_counter % 60 == 0 {
-            debug!("[Slint] Frame {} actually rendered", frame_counter);
-        }
-
-        frame_counter = frame_counter.wrapping_add(1);
-
-        // Log periodic status
-        if frame_counter % 300 == 0 {
-            info!("[Slint] Frame {}, M5Stack CoreS3 running...", frame_counter);
-        }
-
-        ticker.next().await;
-    }
-}
-
-// Render loop task for Embassy integration
-#[embassy_executor::task]
-async fn render_loop_task(
+async fn graphics_task(
     window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
     ui: slint::Weak<MainWindow>,
 ) {
-    info!("=== Render loop task started ====");
+    info!("=== Graphics rendering task started ====");
+
+    let mut ticker = Ticker::every(Duration::from_millis(16)); // ~60fps
+    let mut frame_counter = 0u32;
+
+    // Create pixel buffer for Slint rendering
+    let mut pixel_buffer: Box<[Rgb565Pixel; LCD_BUFFER_SIZE]> =
+        Box::new([Rgb565Pixel(0); LCD_BUFFER_SIZE]);
+
+    info!(
+        "Graphics task initialized with {}x{} buffer",
+        LCD_H_RES, LCD_V_RES
+    );
 
     loop {
-        // Update timers and animations
+        // Update Slint timers and animations
         slint::platform::update_timers_and_animations();
 
         // Check for new WiFi scan results and trigger UI refresh if available
         if WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
             if let Some(ui_strong) = ui.upgrade() {
                 ui_strong.invoke_wifi_refresh();
-                info!("Triggered UI refresh for new WiFi scan results");
+                debug!("Triggered UI refresh for new WiFi scan results");
             }
         }
 
-        // Render if needed - simple version for M5Stack CoreS3
-        window.draw_if_needed(|renderer| {
-            let mut buffer = [slint::platform::software_renderer::Rgb565Pixel(0); 320];
-            for line in 0..240 {
-                renderer.render_by_line(DisplayLineBuffer {
-                    buffer: &mut buffer,
-                    line,
-                });
+        // Render the frame using the hardware display
+        let rendered = window.draw_if_needed(|renderer| {
+            // Access the global display instance
+            if let Some(()) = DISPLAY_COMPONENTS.with_mut(|display_hardware| {
+                // Create hardware draw buffer
+                let mut hardware_buffer =
+                    HardwareDrawBuffer::new(&mut display_hardware.display, &mut *pixel_buffer);
+
+                // Render by line to the hardware display
+                renderer.render_by_line(&mut hardware_buffer);
+
+                if frame_counter % 60 == 0 {
+                    debug!("Frame {} rendered to hardware display", frame_counter);
+                }
+            }) {
+                // Successfully rendered
+            } else {
+                error!("Display not available in graphics task!");
             }
         });
 
-        // Small delay to prevent busy waiting
-        embassy_time::Timer::after(embassy_time::Duration::from_millis(16)).await;
-        // ~60fps
-    }
-}
-
-// Simple line buffer for M5Stack CoreS3 display
-struct DisplayLineBuffer<'a> {
-    buffer: &'a mut [slint::platform::software_renderer::Rgb565Pixel],
-    line: usize,
-}
-
-impl<'a> slint::platform::software_renderer::LineBufferProvider for DisplayLineBuffer<'a> {
-    type TargetPixel = slint::platform::software_renderer::Rgb565Pixel;
-
-    fn process_line(
-        &mut self,
-        line: usize,
-        range: core::ops::Range<usize>,
-        render_fn: impl FnOnce(&mut [Self::TargetPixel]),
-    ) {
-        if line == self.line {
-            render_fn(&mut self.buffer[range]);
+        // If a frame was rendered, log it
+        if rendered {
+            if frame_counter % 60 == 0 {
+                debug!(
+                    "Frame {} rendered and displayed on M5Stack CoreS3",
+                    frame_counter
+                );
+            }
         }
+
+        frame_counter = frame_counter.wrapping_add(1);
+
+        // Log periodic status
+        if frame_counter % 300 == 0 {
+            // Every ~5 seconds at 60fps
+            info!(
+                "Graphics: Frame {}, M5Stack CoreS3 display active",
+                frame_counter
+            );
+        }
+
+        ticker.next().await;
     }
 }
 
@@ -842,12 +547,40 @@ async fn main(spawner: embassy_executor::Spawner) {
     info!("Spawning WiFi scan task");
     spawner.spawn(wifi_scan_task(wifi_ctrl)).ok();
 
-    // Spawn render loop task
-    info!("Spawning render loop task");
-    spawner.spawn(render_loop_task(window, ui.as_weak())).ok();
+    // Initialize graphics hardware using display module
+    info!("=== Starting M5Stack CoreS3 Event Loop ===");
+    info!("Initializing M5Stack CoreS3 display hardware using display module...");
 
-    // Keep the main task alive
+    // Initialize display hardware via display module
+    display::init_display_hardware(
+        peripherals.GPIO3,  // cs
+        peripherals.GPIO34, // rst
+        peripherals.GPIO35, // dc
+        peripherals.GPIO36, // sck
+        peripherals.GPIO37, // mosi
+        peripherals.GPIO48, // backlight
+        peripherals.SPI2,   // SPI peripheral
+    )
+    .expect("Failed to initialize display hardware");
+
+    info!("M5Stack CoreS3 display hardware initialized via display module");
+
+    // Note: WiFi task already spawned above
+
+    // Spawn graphics rendering task on same core
+    info!("Spawning graphics rendering task on Core 0");
+    spawner
+        .spawn(graphics_task(window.clone(), ui.as_weak()))
+        .ok();
+
+    // Keep the main task alive and log status
+    let mut status_counter = 0u32;
     loop {
-        embassy_time::Timer::after(embassy_time::Duration::from_secs(1)).await;
+        embassy_time::Timer::after(embassy_time::Duration::from_secs(10)).await;
+        status_counter += 1;
+        info!(
+            "Main task status check #{} - M5Stack CoreS3 alive",
+            status_counter
+        );
     }
 }

@@ -1,8 +1,5 @@
-/.vscode
-/.embuild
-/target
+.vscode/
+.embuild/
+target/
 Cargo.lock
-/esp32/target
-/esp32/.embuild
-/wasm/target
-/android/target
+
