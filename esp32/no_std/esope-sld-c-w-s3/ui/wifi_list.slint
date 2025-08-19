@@ -1,0 +1,44 @@
+import { VerticalLayout, Text, Rectangle, TouchArea } from "std-widgets.slint";
+
+export component WifiListWindow inherits Window {
+    title: "WiFi Scanner";
+    width: 320px;
+    height: 240px;
+
+    in property <string> status_text: "Scanning...";
+    in property <[string]> access_points;
+    callback connect(index: int);
+
+    VerticalLayout {
+        spacing: 6px;
+        Rectangle {
+            height: 30px;
+            background: #222;
+            Text {
+                text: root.status_text;
+                color: white;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                font-size: 16px;
+            }
+        }
+
+        for ap in root.access_points : index {
+            Rectangle {
+                height: 30px;
+                background: #eee;
+                border-color: #444;
+                border-width: 1px;
+
+                Text {
+                    text: ap;
+                    padding: 4px;
+                }
+
+                TouchArea {
+                    clicked => root.connect(index);
+                }
+            }
+        }
+    }
+}

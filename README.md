@@ -1,27 +1,99 @@
-# Slint Multi-Board Workshop with Bare-Metal Implementation
+# Slint Multi-Board Workshop
 
-This is a Rust Slint Workshop template supporting multiple ESP32-S3 boards using a no_std bare-metal implementation.
+This is a Rust Slint Workshop template supporting multiple ESP32-S3 boards with both **std** (ESP-IDF) and **no_std** (bare-metal) implementations.
+
+## Directory Structure
+
+```
+slint-esp-workshop/
+├── README.md
+├── Cargo.toml (workspace)
+├── ui/                          # Shared Slint UI files
+├── model/                       # Shared model code (no_std compatible)
+├── winit/                       # Desktop implementation (winit)
+├── esp32/                       # ESP32 implementations
+│   ├── std/                     # Standard library implementations (ESP-IDF)
+│   │   ├── esp32-s3-box-3/      # ESP32-S3-BOX-3 std implementation
+│   │   ├── esope-sld-c-w-s3/    # ESoPE board std implementation (planned)
+│   │   ├── m5stack-cores3/      # M5Stack CoreS3 std implementation (planned)
+│   │   └── esp32-s3-lcd-ev-board/ # LCD-EV board std implementation (planned)
+│   └── no_std/                  # No standard library implementations (bare-metal)
+│       ├── esp32-s3-box-3/      # ESP32-S3-BOX-3 no_std implementation
+│       ├── esope-sld-c-w-s3/    # ESoPE board no_std implementation
+│       ├── m5stack-cores3/      # M5Stack CoreS3 no_std implementation (planned)
+│       └── esp32-s3-lcd-ev-board/ # LCD-EV board no_std implementation (planned)
+├── wasm/                        # WebAssembly implementation
+└── android/                     # Android implementation
+```
 
 ## Supported Boards
 
-- **ESP32-S3-BOX-3** (default)
-- **ESoPE-SLD-C-W-S3**
+### Currently Implemented
+- **ESP32-S3-BOX-3** (std + no_std)
+- **ESoPE-SLD-C-W-S3** (no_std)
+
+### Planned
+- **M5Stack CoreS3**
 - **ESP32-S3-LCD-EV-BOARD**
 
-## Switching Boards
+## Quick Start
 
-By default, the workshop is configured for the ESP32-S3-BOX-3. Use different features to build for other boards:
+Choose your preferred implementation approach:
+
+### No_std (Bare-Metal) - Recommended for Embedded
 
 ```sh
-# Default (esp32-s3-box-3)
+# ESP32-S3-BOX-3 (no_std)
+cd esp32/no_std/esp32-s3-box-3
 cargo run --release
 
-# ESoPE board
-cargo run --release --features esope-sld-c-w-s3 --no-default-features
-
-# LCD-EV board
-cargo run --release --features esp32-s3-lcd-ev-board --no-default-features
+# ESoPE board (no_std) 
+cd esp32/no_std/esope-sld-c-w-s3
+cargo run --release
 ```
+
+### Std (ESP-IDF) - More Complex Setup
+
+```sh
+# ESP32-S3-BOX-3 (std)
+cd esp32/std/esp32-s3-box-3
+cargo run --release
+```
+
+## Std vs No_std: Which to Choose?
+
+### No_std (Bare-Metal) - `esp32/no_std/` - **RECOMMENDED**
+**Pros:**
+- ✅ **Much simpler setup** - No C/C++ toolchain required
+- ✅ **Pure Rust** - No ESP-IDF complexity  
+- ✅ Smaller binary size and memory footprint
+- ✅ Better performance and lower latency
+- ✅ Direct hardware control with esp-hal
+- ✅ Faster compilation times
+- ✅ More predictable behavior
+- ✅ **esp-alloc** provides heap allocation when needed
+- ✅ **Highly portable code** - Works across different platforms
+- ✅ **No_std ecosystem** designed for embedded/portable use
+
+**Cons:**
+- ❌ Some std-only crates not available (though embedded alternatives exist)
+
+### Std (ESP-IDF) - `esp32/std/`  
+**Pros:**
+- ✅ Familiar Rust std library
+- ✅ Access to std-only crates
+- ✅ Built-in WiFi/networking stack
+
+**Cons:**
+- ❌ **Complex setup** - Requires full C/C++ ESP-IDF toolchain
+- ❌ **Much more complex** - ESP-IDF brings C/C++ complications
+- ❌ Larger binary size
+- ❌ Higher memory usage
+- ❌ Slower compilation
+- ❌ Less direct hardware control
+- ❌ **Platform-locked code** - Hard to port to other embedded platforms
+
+**Recommendation:** Start with **no_std** for a simpler, pure Rust experience with portable code. Only use **std** if you specifically need existing ESP-IDF C++ components.
 
 ## Pre-requisites
 

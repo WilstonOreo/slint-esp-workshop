@@ -1,0 +1,26 @@
+import { WifiNetwork } from "viewmodel.slint";
+
+import { ListView, HorizontalBox } from "std-widgets.slint";
+
+export component Page inherits Rectangle {
+    VerticalLayout {
+        width: parent.width;
+        height: parent.height;
+        @children
+    }
+}
+
+export component WifiNetworkWidget inherits ListView {
+    in property <[WifiNetwork]> model;
+
+    for wifi in self.model: HorizontalBox {
+        height: 16px;
+
+        Text {
+            text: wifi.ssid;
+            height: parent.height;
+        }
+    }
+}
+
+export component AppWindow inherits Window { }

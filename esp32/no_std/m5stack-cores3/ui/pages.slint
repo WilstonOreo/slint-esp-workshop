@@ -1,0 +1,34 @@
+// This slint file contains all the UI pages of the application.
+
+import { Page, WifiNetworkWidget } from "widgets.slint";
+import { ListView, VerticalBox, Button } from "std-widgets.slint";
+
+import { WifiNetwork } from "viewmodel.slint";
+
+export component WifiNetworkPage inherits Page {
+    callback refresh();
+    in property <[WifiNetwork]> model;
+
+    Text {
+        text: @tr("{} Wifi Networks", model.length);
+        height: 32px;
+        width: parent.width;
+        horizontal-alignment: center;
+    }
+
+    Button {
+        text: @tr("Refresh wifi");
+        height: 32px;
+        width: parent.width;
+
+        clicked => {
+            root.refresh();
+        }
+    }
+
+    wifi := WifiNetworkWidget {
+        model: root.model;
+        // Set explicit height to leave space for header and button
+        height: parent.height - 80px;
+    }
+}
