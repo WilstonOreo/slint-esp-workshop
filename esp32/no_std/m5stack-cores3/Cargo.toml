@@ -8,7 +8,7 @@ rust-version = "1.88"
 [dependencies]
 log = { version = "0.4", default-features = false }
 
-slint = { path = "../../../../slint/api/rs/slint", default-features = false, features = [
+slint = { version = "1.12.1", default-features = false, features = [
     "compat-1-2",
     "unsafe-single-threaded",
     "libm",
@@ -56,4 +56,4 @@ opt-level        = 's'
 overflow-checks  = false
 
 [build-dependencies]
-slint-build = { path = "../../../../slint/api/rs/build", features = ["sdf-fonts"] }
+slint-build = { version = "1.12.1", features = ["sdf-fonts"] }

@@ -645,6 +645,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     let mut status_counter = 0u32;
     let mut touch_ticker = Ticker::every(Duration::from_millis(16)); // ~60Hz touch polling
     let mut last_touch_state = TouchState::Released;
+    let mut last_touch_position = slint::LogicalPosition::new(0.0, 0.0);
 
     loop {
         // Poll touch events if touch controller is available
@@ -656,24 +657,51 @@ async fn main(spawner: embassy_executor::Spawner) {
                         (TouchState::Released, TouchState::Pressed(touch_point)) => {
                             let physical_position =
                                 PhysicalPosition::new(touch_point.x as i32, touch_point.y as i32);
+                            let logical_position =
+                                physical_position.to_logical(window.scale_factor());
+                            last_touch_position = logical_position;
 
                             let pointer_event = WindowEvent::PointerPressed {
-                                position: physical_position.to_logical(1.0),
+                                position: logical_position,
                                 button: PointerEventButton::Left,
                             };
 
                             window.dispatch_event(pointer_event);
-                            info!("Touch PRESSED at x={}, y={}", touch_point.x, touch_point.y);
+                            info!(
+                                "Touch PRESSED at x={}, y={} (logical: {:.1}, {:.1}, scale_factor={})",
+                                touch_point.x,
+                                touch_point.y,
+                                logical_position.x,
+                                logical_position.y,
+                                window.scale_factor()
+                            );
                         }
                         // Touch release event (transition from Pressed to Released)
-                        (TouchState::Pressed(_), TouchState::Released) => {
-                            let pointer_event = WindowEvent::PointerReleased {
-                                position: slint::LogicalPosition::new(0.0, 0.0), // Position doesn't matter for release
+                        (TouchState::Pressed(touch_point), TouchState::Released) => {
+                            // Use the last known touch position for the release event
+                            let physical_position =
+                                PhysicalPosition::new(touch_point.x as i32, touch_point.y as i32);
+                            let logical_position =
+                                physical_position.to_logical(window.scale_factor());
+
+                            // Send PointerReleased at the actual release position
+                            let pointer_released = WindowEvent::PointerReleased {
+                                position: logical_position,
                                 button: PointerEventButton::Left,
                             };
+                            window.dispatch_event(pointer_released);
 
-                            window.dispatch_event(pointer_event);
-                            info!("Touch RELEASED");
+                            // Also send PointerExited to complete the interaction cycle
+                            let pointer_exited = WindowEvent::PointerExited;
+                            window.dispatch_event(pointer_exited);
+
+                            info!(
+                                "Touch RELEASED at x={}, y={} (logical: {:.1}, {:.1}) + EXITED",
+                                touch_point.x,
+                                touch_point.y,
+                                logical_position.x,
+                                logical_position.y
+                            );
                         }
                         // Touch move event (both states are Pressed but potentially different positions)
                         (TouchState::Pressed(old_point), TouchState::Pressed(new_point)) => {
@@ -681,13 +709,23 @@ async fn main(spawner: embassy_executor::Spawner) {
                             if old_point.x != new_point.x || old_point.y != new_point.y {
                                 let physical_position =
                                     PhysicalPosition::new(new_point.x as i32, new_point.y as i32);
+                                let logical_position =
+                                    physical_position.to_logical(window.scale_factor());
+                                last_touch_position = logical_position;
 
                                 let pointer_event = WindowEvent::PointerMoved {
-                                    position: physical_position.to_logical(1.0),
+                                    position: logical_position,
                                 };
 
                                 window.dispatch_event(pointer_event);
-                                debug!("Touch MOVED to x={}, y={}", new_point.x, new_point.y);
+                                debug!(
+                                    "Touch MOVED to x={}, y={} (logical: {:.1}, {:.1}, scale_factor={})",
+                                    new_point.x,
+                                    new_point.y,
+                                    logical_position.x,
+                                    logical_position.y,
+                                    window.scale_factor()
+                                );
                             }
                         }
                         // No state change
