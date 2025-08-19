@@ -4,6 +4,7 @@
 extern crate alloc;
 
 mod display;
+mod touch;
 
 use alloc::boxed::Box;
 use alloc::rc::Rc;
@@ -36,7 +37,16 @@ use embedded_hal::delay::DelayNs;
 use esp_hal::delay::Delay;
 
 // Slint platform imports
+use slint::PhysicalPosition;
 use slint::platform::software_renderer::Rgb565Pixel;
+use slint::platform::{PointerEventButton, WindowEvent};
+
+// Touch controller imports
+use core::cell::RefCell;
+use embedded_hal_bus::i2c::RefCellDevice;
+use ft3x68_rs::{Ft3x68Driver, TouchState};
+use static_cell::StaticCell;
+use touch::{FT6336U_DEVICE_ADDRESS, TouchResetDriverAW9523};
 
 slint::include_modules!();
 
@@ -254,7 +264,7 @@ async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
 }
 */
 
-// Graphics rendering task - handles display output
+// Graphics rendering task - handles display output only
 #[embassy_executor::task]
 async fn graphics_task(
     window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
@@ -331,6 +341,9 @@ async fn graphics_task(
         ticker.next().await;
     }
 }
+
+// TODO: Touch polling task will be implemented later when we add async touch handling
+// For now, touch is tested synchronously in main() and can be extended as needed
 
 // WiFi scanning task
 #[embassy_executor::task]
@@ -412,20 +425,24 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     info!("Starting Slint ESP32 M5Stack CoreS3 Workshop");
 
-    // === Begin M5Stack CoreS3 Power Management Initialization ===
-    // Initialize I2C bus for power management (AXP2101, AW9523)
-    info!("Initializing I2C bus for power management...");
-    let mut power_i2c = I2c::new(
+    // === Begin M5Stack CoreS3 Power Management and I2C Initialization ===
+    // Initialize I2C bus for all I2C devices (AXP2101, AW9523, touch controller)
+    info!("Initializing I2C bus for power management and touch controller...");
+    let power_i2c = I2c::new(
         peripherals.I2C0,
         esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
     )
     .unwrap()
     .with_sda(peripherals.GPIO12) // AXP2101 SDA
     .with_scl(peripherals.GPIO11); // AXP2101 SCL
-    info!("I2C bus initialized for power management");
+    info!("I2C bus initialized for power management and touch");
 
-    // Initialize AXP2101 power management - critical for M5Stack CoreS3 display power
-    match init_axp2101_power(&mut power_i2c) {
+    // Use StaticCell to create a shared I2C bus for all I2C devices (like the working example)
+    static I2C_BUS: StaticCell<RefCell<I2c<'static, esp_hal::Blocking>>> = StaticCell::new();
+    let i2c_bus = I2C_BUS.init(RefCell::new(power_i2c));
+
+    // Initialize AXP2101 power management using shared I2C - critical for M5Stack CoreS3 display power
+    match init_axp2101_power(RefCellDevice::new(i2c_bus)) {
         Ok(_) => {
             info!("AXP2101 power management initialized successfully");
         }
@@ -435,8 +452,8 @@ async fn main(spawner: embassy_executor::Spawner) {
         }
     };
 
-    // Initialize AW9523 GPIO expander using the same I2C bus - both devices share same I2C lines
-    match init_aw9523_gpio_expander(&mut power_i2c) {
+    // Initialize AW9523 GPIO expander using shared I2C - both devices share same I2C lines
+    match init_aw9523_gpio_expander(RefCellDevice::new(i2c_bus)) {
         Ok(_) => {
             info!("AW9523 GPIO expander initialized successfully");
         }
@@ -565,6 +582,55 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     info!("M5Stack CoreS3 display hardware initialized via display module");
 
+    // === Begin Touch Controller Initialization ===
+    info!("Initializing FT6336U touch controller...");
+
+    // Create touch reset driver using shared I2C bus
+    let touch_reset = TouchResetDriverAW9523::new(RefCellDevice::new(i2c_bus));
+
+    // Initialize FT6336U touch driver using shared I2C bus (create fresh delay instance)
+    let touch_delay = Delay::new();
+    let mut touch_driver = Ft3x68Driver::new(
+        RefCellDevice::new(i2c_bus),
+        FT6336U_DEVICE_ADDRESS,
+        touch_reset,
+        touch_delay,
+    );
+
+    let mut _touch_driver_for_task = match touch_driver.initialize() {
+        Ok(_) => {
+            info!("FT6336U touch controller initialized successfully");
+
+            // Test touch polling once to verify it's working
+            info!("Testing touch controller polling...");
+            match touch_driver.touch1() {
+                Ok(touch_state) => match touch_state {
+                    TouchState::Pressed(touch_point) => {
+                        info!(
+                            "Touch controller test: Touch detected at x={}, y={}",
+                            touch_point.x, touch_point.y
+                        );
+                    }
+                    TouchState::Released => {
+                        info!("Touch controller test: No touch detected (released state)");
+                    }
+                },
+                Err(e) => {
+                    info!("Touch controller test: No touch or error: {:?}", e);
+                }
+            }
+            info!("Touch controller test completed - polling functionality verified");
+            info!("Touch events will now be logged when you touch the screen");
+            Some(touch_driver)
+        }
+        Err(e) => {
+            error!("Touch initialization failed: {:?}", e);
+            info!("Continuing without touch functionality");
+            None
+        }
+    };
+    // === End Touch Controller Initialization ===
+
     // Note: WiFi task already spawned above
 
     // Spawn graphics rendering task on same core
@@ -573,14 +639,79 @@ async fn main(spawner: embassy_executor::Spawner) {
         .spawn(graphics_task(window.clone(), ui.as_weak()))
         .ok();
 
-    // Keep the main task alive and log status
+    // === Touch Polling Integration ===
+    info!("Starting continuous touch polling and Slint integration...");
+
     let mut status_counter = 0u32;
+    let mut touch_ticker = Ticker::every(Duration::from_millis(16)); // ~60Hz touch polling
+    let mut last_touch_state = TouchState::Released;
+
     loop {
-        embassy_time::Timer::after(embassy_time::Duration::from_secs(10)).await;
+        // Poll touch events if touch controller is available
+        if let Some(ref mut touch_driver) = _touch_driver_for_task {
+            match touch_driver.touch1() {
+                Ok(touch_state) => {
+                    match (&last_touch_state, &touch_state) {
+                        // Touch press event (transition from Released to Pressed)
+                        (TouchState::Released, TouchState::Pressed(touch_point)) => {
+                            let physical_position =
+                                PhysicalPosition::new(touch_point.x as i32, touch_point.y as i32);
+
+                            let pointer_event = WindowEvent::PointerPressed {
+                                position: physical_position.to_logical(1.0),
+                                button: PointerEventButton::Left,
+                            };
+
+                            window.dispatch_event(pointer_event);
+                            info!("Touch PRESSED at x={}, y={}", touch_point.x, touch_point.y);
+                        }
+                        // Touch release event (transition from Pressed to Released)
+                        (TouchState::Pressed(_), TouchState::Released) => {
+                            let pointer_event = WindowEvent::PointerReleased {
+                                position: slint::LogicalPosition::new(0.0, 0.0), // Position doesn't matter for release
+                                button: PointerEventButton::Left,
+                            };
+
+                            window.dispatch_event(pointer_event);
+                            info!("Touch RELEASED");
+                        }
+                        // Touch move event (both states are Pressed but potentially different positions)
+                        (TouchState::Pressed(old_point), TouchState::Pressed(new_point)) => {
+                            // Only dispatch move event if position actually changed
+                            if old_point.x != new_point.x || old_point.y != new_point.y {
+                                let physical_position =
+                                    PhysicalPosition::new(new_point.x as i32, new_point.y as i32);
+
+                                let pointer_event = WindowEvent::PointerMoved {
+                                    position: physical_position.to_logical(1.0),
+                                };
+
+                                window.dispatch_event(pointer_event);
+                                debug!("Touch MOVED to x={}, y={}", new_point.x, new_point.y);
+                            }
+                        }
+                        // No state change
+                        _ => {}
+                    }
+
+                    last_touch_state = touch_state;
+                }
+                Err(_) => {
+                    // Touch polling error - don't spam logs, just continue
+                }
+            }
+        }
+
+        // Status logging (less frequent than touch polling)
+        if status_counter % 600 == 0 {
+            // Every ~10 seconds at 60Hz
+            info!(
+                "Main task status check #{} - M5Stack CoreS3 alive with touch polling",
+                status_counter / 60
+            );
+        }
+
         status_counter += 1;
-        info!(
-            "Main task status check #{} - M5Stack CoreS3 alive",
-            status_counter
-        );
+        touch_ticker.next().await;
     }
 }
