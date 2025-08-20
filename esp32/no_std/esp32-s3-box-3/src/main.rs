@@ -4,7 +4,6 @@
 extern crate alloc;
 
 mod display;
-mod touch;
 
 use alloc::boxed::Box;
 use alloc::rc::Rc;

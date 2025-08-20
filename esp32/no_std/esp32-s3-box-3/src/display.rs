@@ -72,8 +72,6 @@ pub struct DisplayHardware {
     pub i2c: I2c<'static, esp_hal::Blocking>,
 }
 
-/// Initialize the display hardware directly in main
-/// This follows the approach from esp32-conways-game-of-life-rs
 pub fn init_display_hardware(
     gpio3: esp_hal::peripherals::GPIO3<'static>,
     gpio4: esp_hal::peripherals::GPIO4<'static>,
