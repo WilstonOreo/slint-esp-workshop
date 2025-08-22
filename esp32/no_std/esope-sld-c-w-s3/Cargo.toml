@@ -39,6 +39,7 @@ esp-alloc = "0.8.0"
 esp-backtrace = { version = "0.17.0", features = ["esp32s3", "exception-handler", "println"] }
 heapless = { version = "0.8.0", default-features = false }
 embedded-io = "0.6.1"
+sitronix-touch = "0.0.1"
 
 [profile.dev]
 # Rust debug is too slow.
