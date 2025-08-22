@@ -521,6 +521,31 @@ impl slint::platform::Platform for EspEmbassyBackend {
     }
 }
 
+// Automatic WiFi UI refresh task
+#[embassy_executor::task]
+async fn auto_wifi_refresh_task(ui_weak: slint::Weak<MainWindow>) {
+    info!("=== Auto WiFi refresh task started ====");
+
+    let mut ticker = Ticker::every(Duration::from_secs(2));
+
+    loop {
+        ticker.next().await;
+
+        // Check if new WiFi scan results are available
+        if WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
+            // Try to upgrade weak reference to UI
+            if let Some(ui) = ui_weak.upgrade() {
+                info!("Auto-refreshing WiFi UI with new scan results");
+                ui.invoke_wifi_refresh();
+            } else {
+                // UI has been dropped, stop the task
+                info!("UI reference dropped, stopping auto-refresh task");
+                break;
+            }
+        }
+    }
+}
+
 // WiFi scanning task
 #[embassy_executor::task]
 async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
@@ -733,9 +758,16 @@ async fn main(spawner: Spawner) -> ! {
     // Trigger initial refresh
     ui.invoke_wifi_refresh();
 
+    // Store UI reference for automatic refresh
+    let ui_for_refresh = ui.as_weak();
+
     // Spawn WiFi scanning task
     info!("Spawning WiFi scan task");
     spawner.spawn(wifi_scan_task(wifi_controller)).ok();
+
+    // Spawn automatic WiFi UI refresh task
+    info!("Spawning automatic WiFi refresh task");
+    spawner.spawn(auto_wifi_refresh_task(ui_for_refresh)).ok();
 
     // Show the window
     ui.show().unwrap();
