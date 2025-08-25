@@ -1,7 +1,7 @@
 [workspace]
 members = ["winit", "model"]
 
-exclude = ["esp32", "ui", "wasm", "android"]
+exclude = ["esp32-no_std", "esp32-std", "ui", "wasm", "android"]
 
 [workspace.package]
 version = "0.2.0"
