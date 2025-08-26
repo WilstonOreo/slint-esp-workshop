@@ -95,6 +95,10 @@ cargo run --release
 
 **Recommendation:** Start with **no_std** for a simpler, pure Rust experience with portable code. Only use **std** if you specifically need existing ESP-IDF C++ components.
 
+## ESP-IDF v5.2 Requirement for Std Projects
+
+For the std (ESP-IDF) implementations, you must use ESP-IDF v5.2. This is a requirement for proper compilation and linking with the Rust code.
+
 ## Pre-requisites
 
 - Rust toolchain (minimum version 1.80)

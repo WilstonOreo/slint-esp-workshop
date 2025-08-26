@@ -25,7 +25,7 @@ impl EspPlatform {
     pub fn new() -> std::boxed::Box<Self> {
         use esp_idf_svc::hal::prelude::*;
         use esp_idf_svc::hal::sys::*;
-        use esp_idf_svc::wifi::{Configuration, ClientConfiguration};
+        use esp_idf_svc::wifi::{ClientConfiguration, Configuration};
 
         // Initialize I2C (for touch and audio)
         let peripherals = Peripherals::take().unwrap();
@@ -176,7 +176,9 @@ impl EspPlatform {
             )
             .unwrap(),
         ));
-        wifi.borrow_mut().set_configuration(&Configuration::Client(ClientConfiguration::default())).unwrap();
+        wifi.borrow_mut()
+            .set_configuration(&Configuration::Client(ClientConfiguration::default()))
+            .unwrap();
 
         std::boxed::Box::new(Self {
             display_width,

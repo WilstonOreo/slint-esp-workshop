@@ -23,7 +23,7 @@ impl WifiNetworkProvider for Model {
         // For Linux, we need std for process execution
         extern crate std;
         use alloc::vec;
-        
+
         String::from_utf8(
             std::process::Command::new("nmcli")
                 .arg("-t")
@@ -51,7 +51,7 @@ impl WifiNetworkProvider for Model {
 impl WifiNetworkProvider for Model {
     fn scan_wifi_networks(&self) -> Vec<WifiNetwork> {
         use alloc::vec;
-        
+
         vec![
             WifiNetwork {
                 ssid: "ESP32 Network A".into(),
