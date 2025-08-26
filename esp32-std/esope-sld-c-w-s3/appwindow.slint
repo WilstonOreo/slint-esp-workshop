@@ -1,0 +1,22 @@
+/// The Base class is imported as Window from widgets.slint.
+import { AppWindow } from "../ui/widgets.slint";
+
+import { TabWidget, Slider, HorizontalBox, Switch } from "std-widgets.slint";
+
+export component MainWindow inherits AppWindow {
+    VerticalLayout {
+        Text {
+            text: "Welcome to the Slint Workshop";
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: "Screen resolution: \{root.width * 1phx / 1px / 1phx} x \{root.height * 1phx / 1px / 1phx}";
+            horizontal-alignment: center;
+        }
+
+        Switch {
+            text: "This is a switch";
+        }
+    }
+}
