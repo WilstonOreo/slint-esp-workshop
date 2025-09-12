@@ -1,8 +1,8 @@
 #![no_std]
 
 extern crate alloc;
+use crate::alloc::string::ToString;
 use alloc::{string::String, vec::Vec};
-
 /// Simple Struct for storing WiFi Network data.
 pub struct WifiNetwork {
     pub ssid: String,

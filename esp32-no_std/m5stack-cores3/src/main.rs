@@ -4,6 +4,7 @@
 extern crate alloc;
 extern crate esp_bootloader_esp_idf;
 
+mod dht22;
 mod display;
 mod touch;
 
@@ -30,7 +31,9 @@ use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec;
+use core::ops::{Deref, DerefMut};
 use core::panic::PanicInfo;
+use esp_hal::gpio::OutputConfig;
 use log::{debug, error, info};
 
 // WiFi imports - simplified
@@ -74,6 +77,13 @@ slint::include_modules!();
 static WIFI_SCAN_RESULTS: Mutex<CriticalSectionRawMutex, alloc::vec::Vec<AccessPointInfo>> =
     Mutex::new(alloc::vec::Vec::new());
 static WIFI_SCAN_UPDATED: AtomicBool = AtomicBool::new(false);
+/*
+static DHT22_RESULT: Mutex<CriticalSectionRawMutex, dht_sensor::dht22::Reading> =
+    Mutex::new(dht_sensor::dht22::Reading {
+        temperature: 0.0,
+        relative_humidity: 0.0,
+    });
+*/
 
 // Display constants for M5Stack CoreS3 - 320x240 ILI9341
 const LCD_H_RES: u16 = 320;
@@ -253,37 +263,6 @@ impl slint::platform::Platform for EspEmbassyBackend {
     }
 }
 
-// WiFi scanning will be added later - focusing on display first
-/*
-#[embassy_executor::task]
-async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
-    info!("[WiFi] WiFi scan task started");
-
-    let mut ticker = Ticker::every(Duration::from_secs(5));
-
-    loop {
-        ticker.next().await;
-        info!("[WiFi] Starting WiFi scan...");
-
-        // WiFi scanning implementation will be added here
-        // For now, just simulate some networks
-        let mock_networks = vec![
-            WifiNetwork {
-                ssid: "Mock Network 1".into(),
-            },
-            WifiNetwork {
-                ssid: "Mock Network 2".into(),
-            },
-        ];
-
-        // Store mock results
-        WIFI_SCAN_UPDATED.store(true, Ordering::Relaxed);
-
-        embassy_time::Timer::after(Duration::from_secs(1)).await;
-    }
-}
-*/
-
 // Graphics rendering task - handles display output only
 #[embassy_executor::task]
 async fn graphics_task(
@@ -424,6 +403,54 @@ async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
 
         // Wait 10 seconds before next scan
         embassy_time::Timer::after(embassy_time::Duration::from_secs(10)).await;
+    }
+}
+
+use embassy_sync::channel::{Channel, Receiver, Sender};
+use esp_hal::{
+    gpio::{AnyPin, Input, InputConfig, Level, Output},
+    peripherals::Peripherals,
+};
+
+struct MyDelay(Delay);
+
+impl Deref for MyDelay {
+    type Target = Delay;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for MyDelay {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[embassy_executor::task]
+async fn dht22_task(mut pin: AnyPin<'static>) {
+    let mut input = Input::new(pin, InputConfig::default());
+    //    let mut output = Output::new(pin, Level::Low, OutputConfig::default());
+    let mut delay = Delay::new();
+
+    loop {
+        // Run the blocking DHT22 read in a dedicated threadpool
+        let res = dht22::read(&mut delay, &mut input);
+
+        match res {
+            Ok(reading) => {
+                info!(
+                    "DHT22 Read OK: Temp={}°C, Humidity={}%",
+                    reading.temperature, reading.relative_humidity
+                );
+            }
+            Err(e) => {
+                log::warn!("DHT22 Read failed: {:?}", e);
+            }
+        }
+
+        delay.delay_millis(500);
     }
 }
 
@@ -583,6 +610,12 @@ async fn main(spawner: embassy_executor::Spawner) {
     // Spawn WiFi scanning task
     info!("Spawning WiFi scan task");
     spawner.spawn(wifi_scan_task(wifi_ctrl)).ok();
+
+    // Acquire Handle to IO
+    let mut io = esp_hal::gpio::Io::new(peripherals.IO_MUX);
+
+    info!("Spawning DHT22 task");
+    spawner.spawn(dht22_task(peripherals.GPIO5.into())).ok();
 
     // Initialize graphics hardware using display module
     info!("=== Starting M5Stack CoreS3 Event Loop ===");
