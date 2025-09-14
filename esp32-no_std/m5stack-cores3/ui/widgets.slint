@@ -1,6 +1,8 @@
 import { WifiNetwork } from "viewmodel.slint";
 
-import { ListView, HorizontalBox } from "std-widgets.slint";
+import { ListView, HorizontalBox, Palette } from "std-widgets.slint";
+
+import { StyleMetrics } from "style.slint";
 
 export component Page inherits Rectangle {
     VerticalLayout {
@@ -21,6 +23,86 @@ export component WifiNetworkWidget inherits ListView {
             height: parent.height;
         }
     }
+}
+
+
+/// The indicator component displays a value within a range as a vertical bar.
+export component Indicator {
+    in property <float> value: 40;
+    in property <float> min-value: 0;
+    in property <float> max-value: 100;
+    in property <string> unit: "°C";
+    in property <brush> background <=> fill.background;
+    in property <bool> has-value: true;
+
+    // Ensure displayed level stays within min and max.
+    out property <float> level: (Math.clamp(self.value, self.min-value, self.max-value) - self.min-value) / (self.max-value - self.min-value);
+    animate level { duration: 1000ms; }
+
+    // Right now, fill and bar are on top of each other. But they could also be nested.
+
+    fill := Rectangle {
+        x: 0;
+        y: parent.height - self.height;
+        width: StyleMetrics.indicator-bar-width;
+        // Our root is also our parent right now.
+        height: root.height * root.level;
+        background: Colors.red;
+    }
+
+    bar := Rectangle {
+        x: 0;
+        border-width: 2px;
+        width: StyleMetrics.indicator-bar-width;
+        height: parent.height;
+    }
+
+    value-text := Text {
+        text: "" + root.value.round() + " " + root.unit;
+        font-size: 32px;
+        x: StyleMetrics.indicator-bar-width + StyleMetrics.padding;
+    }
+
+    min-text := Text {
+        text: "" + Math.round(root.min-value);
+        x: StyleMetrics.indicator-bar-width + StyleMetrics.padding;
+        y: parent.height - self.height;
+    }
+
+    max-text := Text {
+        text: "" + root.max-value.round();
+        x: StyleMetrics.indicator-bar-width + StyleMetrics.padding;
+        y: 0;
+    }
+
+    states [
+        value when root.has-value: {
+            value-text.visible: true;
+            fill.visible: true;
+            bar.border-color: Palette.foreground;
+        }
+        no-value when !root.has-value: {
+            value-text.visible: false;
+            fill.visible: false;
+            bar.border-color: Palette.alternate-background;
+        }
+    ]
+}
+
+export component TemperatureBar inherits Indicator {
+    value: 20;
+    min-value: -20;
+    max-value: 50;
+    unit: "°C";
+    background: #ff0000.mix(#0000ff, root.level);
+}
+
+export component HumidityBar inherits Indicator {
+    value: 55;
+    min-value: 0;
+    max-value: 100;
+    unit: "%";
+    background: #0000ff;
 }
 
 export component AppWindow inherits Window { }

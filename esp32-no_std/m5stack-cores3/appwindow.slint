@@ -2,15 +2,15 @@
 import { AppWindow } from "ui/widgets.slint";
 
 import { Switch, TabWidget, AboutSlint } from "std-widgets.slint";
-import { WifiNetworkPage } from "ui/pages.slint";
+import { WifiNetworkPage, TemperaturePage } from "ui/pages.slint";
 
-import { WifiNetwork } from "ui/viewmodel.slint";
+import { WifiNetwork, WeatherRecord } from "ui/viewmodel.slint";
 
 export component MainWindow inherits AppWindow {
     in property <[WifiNetwork]> wifi_network_model;
+    in property <WeatherRecord> weather-record;
 
     callback wifi_refresh;
-    
     public function invoke_wifi_refresh() {
         self.wifi_refresh();
     }
@@ -24,6 +24,15 @@ export component MainWindow inherits AppWindow {
                 refresh => {
                     root.wifi_refresh();
                 }
+            }
+        }
+
+        Tab {
+            title: "Temperature";
+
+            TemperaturePage {
+                temperature-celsius: weather-record.temperature_celsius;
+                humidity-percent: weather-record.humidity_percent;
             }
         }
 
