@@ -267,7 +267,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     let esp_wifi_ctrl = wifi::create_wifi_controller(timg0, rng);
     info!("WiFi controller initialized");
 
-    let (wifi_controller, _interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI)
+    let (wifi_controller, _interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, peripherals.WIFI)
         .expect("Failed to create WiFi interface");
     info!("WiFi interface created");
 
@@ -351,14 +351,15 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // Spawn WiFi scanning task
     info!("Spawning WiFi scan task");
-    spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
-
-    // Acquire Handle to IO
-    let mut io = esp_hal::gpio::Io::new(peripherals.IO_MUX);
+    // spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
 
     info!("Spawning DHT22 task");
-    spawner.spawn(dht22::dht22_task(peripherals.GPIO5)).ok();
-
+    /*  spawner
+            .spawn(dht22::dht22_task(esp_hal::gpio::Flex::new(
+                peripherals.GPIO5,
+            )))
+            .ok();
+    */
     // Initialize graphics hardware using display module
     info!("=== Starting M5Stack CoreS3 Event Loop ===");
     info!("Initializing M5Stack CoreS3 display hardware using display module...");
