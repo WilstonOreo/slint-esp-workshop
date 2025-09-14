@@ -9,7 +9,6 @@ rust-version = "1.88"
 
 [dependencies]
 log = { version = "0.4", default-features = false }
-dht22-sensor = { git = "https://github.com/ImplFerris/dht22-sensor" }
 
 slint = { version = "1.12.1", default-features = false, features = [
     "compat-1-2",
@@ -74,5 +73,4 @@ opt-level = 's'
 overflow-checks = false
 
 [build-dependencies]
-
 slint-build = { version = "1.12.1", features = ["sdf-fonts"] }
