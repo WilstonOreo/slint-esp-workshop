@@ -17,6 +17,8 @@ slint = { version = "1.12.1", default-features = false, features = [
     "renderer-software",
 ] }
 
+dht22-sensor = { git = "https://github.com/ImplFerris/dht22-sensor" }
+
 # M5Stack CoreS3 display and power management dependencies
 embedded-graphics = "0.8.1"
 embedded-graphics-core = "0.4"

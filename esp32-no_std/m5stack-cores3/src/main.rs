@@ -7,6 +7,8 @@ extern crate esp_bootloader_esp_idf;
 mod dht22;
 mod display;
 mod touch;
+mod ui;
+mod wifi;
 
 esp_bootloader_esp_idf::esp_app_desc!(
     // Version
@@ -29,21 +31,18 @@ esp_bootloader_esp_idf::esp_app_desc!(
 
 use alloc::boxed::Box;
 use alloc::rc::Rc;
-use alloc::string::String;
 use alloc::vec;
-use core::ops::{Deref, DerefMut};
-use core::panic::PanicInfo;
-use esp_hal::gpio::OutputConfig;
+use core::{cell::RefCell, panic::PanicInfo};
 use log::{debug, error, info};
+use slint::{
+    PhysicalPosition,
+    platform::{PointerEventButton, WindowEvent},
+};
 
 // WiFi imports - simplified
-use core::sync::atomic::{AtomicBool, Ordering};
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::mutex::Mutex;
+use core::sync::atomic::Ordering;
 use embassy_time::{Duration, Ticker};
 use esp_hal::rng::Rng;
-use esp_wifi::EspWifiController;
-use esp_wifi::wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiController};
 
 // ESP32 HAL imports - only what we need
 use esp_alloc as _;
@@ -55,42 +54,14 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_println::logger::init_logger_from_env;
 
 // Display imports
-use display::{DISPLAY_COMPONENTS, HardwareDrawBuffer};
 use embedded_hal::delay::DelayNs;
 use esp_hal::delay::Delay;
 
-// Slint platform imports
-use slint::PhysicalPosition;
-use slint::platform::software_renderer::Rgb565Pixel;
-use slint::platform::{PointerEventButton, WindowEvent};
-
 // Touch controller imports
-use core::cell::RefCell;
 use embedded_hal_bus::i2c::RefCellDevice;
 use ft3x68_rs::{Ft3x68Driver, TouchState};
 use static_cell::StaticCell;
 use touch::{FT6336U_DEVICE_ADDRESS, TouchResetDriverAW9523};
-
-slint::include_modules!();
-
-// Shared state for WiFi scan results
-static WIFI_SCAN_RESULTS: Mutex<CriticalSectionRawMutex, alloc::vec::Vec<AccessPointInfo>> =
-    Mutex::new(alloc::vec::Vec::new());
-static WIFI_SCAN_UPDATED: AtomicBool = AtomicBool::new(false);
-/*
-static DHT22_RESULT: Mutex<CriticalSectionRawMutex, dht_sensor::dht22::Reading> =
-    Mutex::new(dht_sensor::dht22::Reading {
-        temperature: 0.0,
-        relative_humidity: 0.0,
-    });
-*/
-
-// Display constants for M5Stack CoreS3 - 320x240 ILI9341
-const LCD_H_RES: u16 = 320;
-const LCD_V_RES: u16 = 240;
-const LCD_H_RES_USIZE: usize = 320;
-const LCD_V_RES_USIZE: usize = 240;
-const LCD_BUFFER_SIZE: usize = LCD_H_RES_USIZE * LCD_V_RES_USIZE;
 
 // I2C device addresses for M5Stack CoreS3 power management
 const AXP2101_ADDRESS: u8 = 0x34; // AXP2101 power management IC
@@ -98,26 +69,13 @@ const AW9523_I2C_ADDRESS: u8 = 0x58; // AW9523 GPIO expander
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    error!("PANIC: {}", info);
+    error!("PANIC: {info}");
     loop {}
-}
-
-// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
 }
 
 fn init_heap(psram: &esp_hal::peripherals::PSRAM<'_>) {
     let (start, size) = esp_hal::psram::psram_raw_parts(psram);
-    info!(
-        "Initializing PSRAM heap: start: {:p}, size: {}",
-        start, size
-    );
+    info!("Initializing PSRAM heap: start: {start:p}, size: {size}");
     unsafe {
         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
             start,
@@ -239,221 +197,6 @@ where
     Ok(())
 }
 
-struct EspEmbassyBackend {
-    window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
-}
-
-impl EspEmbassyBackend {
-    fn new(window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>) -> Self {
-        Self { window }
-    }
-}
-
-impl slint::platform::Platform for EspEmbassyBackend {
-    fn create_window_adapter(
-        &self,
-    ) -> Result<Rc<dyn slint::platform::WindowAdapter>, slint::PlatformError> {
-        Ok(self.window.clone())
-    }
-
-    fn duration_since_start(&self) -> core::time::Duration {
-        embassy_time::Instant::now()
-            .duration_since(embassy_time::Instant::from_secs(0))
-            .into()
-    }
-}
-
-// Graphics rendering task - handles display output only
-#[embassy_executor::task]
-async fn graphics_task(
-    window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
-    ui: slint::Weak<MainWindow>,
-) {
-    info!("=== Graphics rendering task started ====");
-
-    let mut ticker = Ticker::every(Duration::from_millis(16)); // ~60fps
-    let mut frame_counter = 0u32;
-
-    // Create pixel buffer for Slint rendering
-    let mut pixel_buffer: Box<[Rgb565Pixel; LCD_BUFFER_SIZE]> =
-        Box::new([Rgb565Pixel(0); LCD_BUFFER_SIZE]);
-
-    info!(
-        "Graphics task initialized with {}x{} buffer",
-        LCD_H_RES, LCD_V_RES
-    );
-
-    loop {
-        // Update Slint timers and animations
-        slint::platform::update_timers_and_animations();
-
-        // Check for new WiFi scan results and trigger UI refresh if available
-        if WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
-            if let Some(ui_strong) = ui.upgrade() {
-                ui_strong.invoke_wifi_refresh();
-                debug!("Triggered UI refresh for new WiFi scan results");
-            }
-        }
-
-        // Render the frame using the hardware display
-        let rendered = window.draw_if_needed(|renderer| {
-            // Access the global display instance
-            if let Some(()) = DISPLAY_COMPONENTS.with_mut(|display_hardware| {
-                // Create hardware draw buffer
-                let mut hardware_buffer =
-                    HardwareDrawBuffer::new(&mut display_hardware.display, &mut *pixel_buffer);
-
-                // Render by line to the hardware display
-                renderer.render_by_line(&mut hardware_buffer);
-
-                if frame_counter % 60 == 0 {
-                    debug!("Frame {} rendered to hardware display", frame_counter);
-                }
-            }) {
-                // Successfully rendered
-            } else {
-                error!("Display not available in graphics task!");
-            }
-        });
-
-        // If a frame was rendered, log it
-        if rendered {
-            if frame_counter % 60 == 0 {
-                debug!(
-                    "Frame {} rendered and displayed on M5Stack CoreS3",
-                    frame_counter
-                );
-            }
-        }
-
-        frame_counter = frame_counter.wrapping_add(1);
-
-        // Log periodic status
-        if frame_counter % 300 == 0 {
-            // Every ~5 seconds at 60fps
-            info!(
-                "Graphics: Frame {}, M5Stack CoreS3 display active",
-                frame_counter
-            );
-        }
-
-        ticker.next().await;
-    }
-}
-
-// TODO: Touch polling task will be implemented later when we add async touch handling
-// For now, touch is tested synchronously in main() and can be extended as needed
-
-// WiFi scanning task
-#[embassy_executor::task]
-async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
-    info!("=== WiFi scan task started ====");
-
-    // Start WiFi
-    let client_config = Configuration::Client(ClientConfiguration {
-        ssid: String::new(),
-        password: String::new(),
-        ..Default::default()
-    });
-
-    match wifi_controller.set_configuration(&client_config) {
-        Ok(_) => info!("WiFi configuration set successfully"),
-        Err(e) => info!("Failed to set WiFi configuration: {:?}", e),
-    }
-
-    match wifi_controller.start_async().await {
-        Ok(_) => info!("WiFi started successfully!"),
-        Err(e) => info!("Failed to start WiFi: {:?}", e),
-    }
-
-    // Wait a bit for WiFi to initialize
-    embassy_time::Timer::after(embassy_time::Duration::from_secs(2)).await;
-
-    loop {
-        info!("Performing WiFi scan...");
-
-        match wifi_controller.scan_n_async(10).await {
-            Ok(results) => {
-                info!("Found {} networks:", results.len());
-                for (i, ap) in results.iter().enumerate() {
-                    info!(
-                        "  {}: SSID: {}, Signal: {:?}, Auth: {:?}, Channel: {}",
-                        i + 1,
-                        ap.ssid.as_str(),
-                        ap.signal_strength,
-                        ap.auth_method,
-                        ap.channel
-                    );
-                }
-
-                // Store scan results in shared state
-                if let Ok(mut scan_results) = WIFI_SCAN_RESULTS.try_lock() {
-                    scan_results.clear();
-                    scan_results.extend_from_slice(&results);
-                    WIFI_SCAN_UPDATED.store(true, Ordering::Relaxed);
-                    info!("Stored {} scan results for UI", scan_results.len());
-                } else {
-                    info!("Could not store scan results (mutex locked)");
-                }
-            }
-            Err(e) => {
-                info!("WiFi scan failed: {:?}", e);
-            }
-        }
-
-        // Wait 10 seconds before next scan
-        embassy_time::Timer::after(embassy_time::Duration::from_secs(10)).await;
-    }
-}
-
-use embassy_sync::channel::{Channel, Receiver, Sender};
-use esp_hal::{
-    gpio::{AnyPin, Input, InputConfig, Level, Output},
-    peripherals::Peripherals,
-};
-
-struct MyDelay(Delay);
-
-impl Deref for MyDelay {
-    type Target = Delay;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for MyDelay {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[embassy_executor::task]
-async fn dht22_task(mut pin: AnyPin<'static>) {
-    let mut input = Input::new(pin, InputConfig::default());
-    //    let mut output = Output::new(pin, Level::Low, OutputConfig::default());
-    let mut delay = Delay::new();
-
-    loop {
-        // Run the blocking DHT22 read in a dedicated threadpool
-        let res = dht22::read(&mut delay, &mut input);
-
-        match res {
-            Ok(reading) => {
-                info!(
-                    "DHT22 Read OK: Temp={}°C, Humidity={}%",
-                    reading.temperature, reading.relative_humidity
-                );
-            }
-            Err(e) => {
-                log::warn!("DHT22 Read failed: {:?}", e);
-            }
-        }
-
-        delay.delay_millis(500);
-    }
-}
-
 #[esp_hal_embassy::main]
 async fn main(spawner: embassy_executor::Spawner) {
     // Initialize peripherals first
@@ -521,10 +264,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     let rng = Rng::new(peripherals.RNG);
 
     info!("Initializing WiFi...");
-    let esp_wifi_ctrl = &*mk_static!(
-        EspWifiController<'static>,
-        esp_wifi::init(timg0.timer0, rng.clone()).expect("Failed to initialize WiFi")
-    );
+    let esp_wifi_ctrl = wifi::create_wifi_controller(timg0, rng);
     info!("WiFi controller initialized");
 
     let (wifi_controller, _interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI)
@@ -546,26 +286,28 @@ async fn main(spawner: embassy_executor::Spawner) {
     );
     window.set_size(slint::PhysicalSize::new(320, 240));
 
-    let backend = Box::new(EspEmbassyBackend::new(window.clone()));
+    let backend = Box::new(crate::ui::EspEmbassyBackend::new(window.clone()));
     slint::platform::set_platform(backend).expect("backend already initialized");
     info!("Custom Slint backend initialized");
 
     // Initial liveness check
     info!("System initialization complete - M5Stack CoreS3 is alive and ready");
     // Create the UI
-    let ui = MainWindow::new().unwrap();
+    let ui = crate::ui::MainWindow::new().unwrap();
 
     // Create empty WiFi network model with some placeholder data
     let placeholder_networks = vec![
-        WifiNetwork {
+        crate::ui::WifiNetwork {
             ssid: "WiFi Scanning...".into(),
         },
-        WifiNetwork {
+        crate::ui::WifiNetwork {
             ssid: "Please wait".into(),
         },
     ];
 
-    let wifi_model = Rc::new(slint::VecModel::<WifiNetwork>::from(placeholder_networks));
+    let wifi_model = Rc::new(slint::VecModel::<crate::ui::WifiNetwork>::from(
+        placeholder_networks,
+    ));
     ui.set_wifi_network_model(wifi_model.clone().into());
 
     // Set up WiFi refresh handler with real WiFi functionality
@@ -573,20 +315,20 @@ async fn main(spawner: embassy_executor::Spawner) {
         info!("WiFi refresh requested - checking for scan results");
 
         // Check if we have new scan results
-        if WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
+        if crate::wifi::WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
             // Access the scan results
-            let scan_results = WIFI_SCAN_RESULTS.try_lock();
+            let scan_results = crate::wifi::WIFI_SCAN_RESULTS.try_lock();
             if let Ok(results) = scan_results {
                 let mut networks = alloc::vec::Vec::new();
 
                 for ap in results.iter() {
-                    networks.push(WifiNetwork {
+                    networks.push(crate::ui::WifiNetwork {
                         ssid: ap.ssid.as_str().into(),
                     });
                 }
 
                 if networks.is_empty() {
-                    networks.push(WifiNetwork {
+                    networks.push(crate::ui::WifiNetwork {
                         ssid: "No networks found".into(),
                     });
                 }
@@ -595,7 +337,7 @@ async fn main(spawner: embassy_executor::Spawner) {
                 wifi_model.set_vec(networks);
 
                 // Reset the update flag
-                WIFI_SCAN_UPDATED.store(false, Ordering::Relaxed);
+                crate::wifi::WIFI_SCAN_UPDATED.store(false, Ordering::Relaxed);
             } else {
                 info!("Could not access scan results (locked)");
             }
@@ -609,13 +351,13 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // Spawn WiFi scanning task
     info!("Spawning WiFi scan task");
-    spawner.spawn(wifi_scan_task(wifi_ctrl)).ok();
+    spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
 
     // Acquire Handle to IO
     let mut io = esp_hal::gpio::Io::new(peripherals.IO_MUX);
 
     info!("Spawning DHT22 task");
-    spawner.spawn(dht22_task(peripherals.GPIO5.into())).ok();
+    spawner.spawn(dht22::dht22_task(peripherals.GPIO5)).ok();
 
     // Initialize graphics hardware using display module
     info!("=== Starting M5Stack CoreS3 Event Loop ===");
@@ -686,10 +428,12 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // Note: WiFi task already spawned above
 
+    use slint::ComponentHandle;
+
     // Spawn graphics rendering task on same core
     info!("Spawning graphics rendering task on Core 0");
     spawner
-        .spawn(graphics_task(window.clone(), ui.as_weak()))
+        .spawn(crate::ui::ui_task(window.clone(), ui.as_weak()))
         .ok();
 
     // === Touch Polling Integration ===

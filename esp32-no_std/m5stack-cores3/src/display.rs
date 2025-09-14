@@ -19,6 +19,11 @@ use mipidsi::options::{ColorInversion, ColorOrder};
 // Global storage for display components - using a safer approach
 use core::cell::UnsafeCell;
 
+// SAFETY: This is only safe because we're in a single-threaded embedded environment
+unsafe impl Sync for DisplayComponentsContainer {}
+
+pub static DISPLAY_COMPONENTS: DisplayComponentsContainer = DisplayComponentsContainer::new();
+
 pub struct DisplayComponentsContainer {
     inner: UnsafeCell<Option<DisplayHardware>>,
 }
@@ -47,11 +52,6 @@ impl DisplayComponentsContainer {
         }
     }
 }
-
-// SAFETY: This is only safe because we're in a single-threaded embedded environment
-unsafe impl Sync for DisplayComponentsContainer {}
-
-pub static DISPLAY_COMPONENTS: DisplayComponentsContainer = DisplayComponentsContainer::new();
 
 pub struct DisplayHardware {
     pub display: mipidsi::Display<
