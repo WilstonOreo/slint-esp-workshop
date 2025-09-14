@@ -427,7 +427,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     // Spawn graphics rendering task on same core
     info!("Spawning graphics rendering task on Core 0");
     spawner
-        .spawn(crate::ui::ui_task(window.clone(), ui.as_weak()))
+        .spawn(crate::ui::ui_update_task(window.clone(), ui.as_weak()))
         .ok();
     info!("Spawning DHT22 task");
     let mut dht_pin = esp_hal::gpio::Flex::new(peripherals.GPIO5);

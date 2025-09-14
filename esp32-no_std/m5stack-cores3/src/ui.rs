@@ -1,5 +1,3 @@
-use core::sync::atomic::Ordering;
-
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 
@@ -7,18 +5,18 @@ use embassy_time::{Duration, Ticker};
 // Slint platform imports
 use slint::platform::software_renderer::Rgb565Pixel;
 
+use crate::dht22;
+
 // Display constants for M5Stack CoreS3 - 320x240 ILI9341
 const LCD_H_RES: u16 = 320;
 const LCD_V_RES: u16 = 240;
-const LCD_H_RES_USIZE: usize = 320;
-const LCD_V_RES_USIZE: usize = 240;
-const LCD_BUFFER_SIZE: usize = LCD_H_RES_USIZE * LCD_V_RES_USIZE;
+const LCD_BUFFER_SIZE: usize = (LCD_H_RES as usize) * (LCD_H_RES as usize);
 
 slint::include_modules!();
 
 // Graphics rendering task - handles display output only
 #[embassy_executor::task]
-pub async fn ui_task(
+pub async fn ui_update_task(
     window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
     ui: slint::Weak<MainWindow>,
 ) {
@@ -38,11 +36,22 @@ pub async fn ui_task(
         slint::platform::update_timers_and_animations();
 
         // Check for new WiFi scan results and trigger UI refresh if available
-        if crate::wifi::WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
+        if crate::wifi::WIFI_SCAN_UPDATED.load(core::sync::atomic::Ordering::Relaxed) {
             if let Some(ui_strong) = ui.upgrade() {
                 ui_strong.invoke_wifi_refresh();
                 log::debug!("Triggered UI refresh for new WiFi scan results");
             }
+        }
+
+        // Check for new WiFi scan results and trigger UI refresh if available
+        if let Some(main_window) = ui.upgrade() {
+            log::debug!("Triggered UI refresh for new weather record");
+            let reading = dht22::DHT22_CHANNEL.receive().await;
+            log::info!("Update weather UI");
+            main_window.set_weather_record(crate::ui::WeatherRecord {
+                temperature_celsius: reading.temperature,
+                humidity_percent: reading.relative_humidity,
+            });
         }
 
         // Render the frame using the hardware display
