@@ -351,7 +351,7 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // Spawn WiFi scanning task
     info!("Spawning WiFi scan task");
-    // spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
+    spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
 
     // Initialize graphics hardware using display module
     info!("=== Starting M5Stack CoreS3 Event Loop ===");
@@ -447,7 +447,6 @@ async fn main(spawner: embassy_executor::Spawner) {
     let mut status_counter = 0u32;
     let mut touch_ticker = Ticker::every(Duration::from_millis(16)); // ~60Hz touch polling
     let mut last_touch_state = TouchState::Released;
-    let mut last_touch_position = slint::LogicalPosition::new(0.0, 0.0);
 
     loop {
         // Poll touch events if touch controller is available
@@ -461,7 +460,6 @@ async fn main(spawner: embassy_executor::Spawner) {
                                 PhysicalPosition::new(touch_point.x as i32, touch_point.y as i32);
                             let logical_position =
                                 physical_position.to_logical(window.scale_factor());
-                            last_touch_position = logical_position;
 
                             let pointer_event = WindowEvent::PointerPressed {
                                 position: logical_position,
@@ -513,7 +511,6 @@ async fn main(spawner: embassy_executor::Spawner) {
                                     PhysicalPosition::new(new_point.x as i32, new_point.y as i32);
                                 let logical_position =
                                     physical_position.to_logical(window.scale_factor());
-                                last_touch_position = logical_position;
 
                                 let pointer_event = WindowEvent::PointerMoved {
                                     position: logical_position,
