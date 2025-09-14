@@ -43,26 +43,19 @@ impl DisplayComponentsContainer {
     }
 
     pub fn with_mut<R>(&self, f: impl FnOnce(&mut DisplayHardware) -> R) -> Option<R> {
-        unsafe {
-            if let Some(ref mut hardware) = *self.inner.get() {
-                Some(f(hardware))
-            } else {
-                None
-            }
-        }
+        unsafe { (*self.inner.get()).as_mut().map(f) }
     }
 }
 
+type SpiInterface<'a> = mipidsi::interface::SpiInterface<
+    'a,
+    ExclusiveDevice<Spi<'a, esp_hal::Blocking>, Output<'a>, Delay>,
+    Output<'a>,
+>;
+
 pub struct DisplayHardware {
-    pub display: mipidsi::Display<
-        mipidsi::interface::SpiInterface<
-            'static,
-            ExclusiveDevice<Spi<'static, esp_hal::Blocking>, Output<'static>, Delay>,
-            Output<'static>,
-        >,
-        mipidsi::models::ILI9342CRgb565,
-        Output<'static>,
-    >,
+    pub display:
+        mipidsi::Display<SpiInterface<'static>, mipidsi::models::ILI9342CRgb565, Output<'static>>,
 }
 
 /// Initialize the display hardware for M5Stack CoreS3

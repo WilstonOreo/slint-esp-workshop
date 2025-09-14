@@ -353,13 +353,6 @@ async fn main(spawner: embassy_executor::Spawner) {
     info!("Spawning WiFi scan task");
     // spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
 
-    info!("Spawning DHT22 task");
-    /*  spawner
-            .spawn(dht22::dht22_task(esp_hal::gpio::Flex::new(
-                peripherals.GPIO5,
-            )))
-            .ok();
-    */
     // Initialize graphics hardware using display module
     info!("=== Starting M5Stack CoreS3 Event Loop ===");
     info!("Initializing M5Stack CoreS3 display hardware using display module...");
@@ -412,7 +405,7 @@ async fn main(spawner: embassy_executor::Spawner) {
                     }
                 },
                 Err(e) => {
-                    info!("Touch controller test: No touch or error: {:?}", e);
+                    info!("Touch controller test: No touch or error: {e:?}");
                 }
             }
             info!("Touch controller test completed - polling functionality verified");
@@ -420,7 +413,7 @@ async fn main(spawner: embassy_executor::Spawner) {
             Some(touch_driver)
         }
         Err(e) => {
-            error!("Touch initialization failed: {:?}", e);
+            error!("Touch initialization failed: {e:?}");
             info!("Continuing without touch functionality");
             None
         }
@@ -436,6 +429,17 @@ async fn main(spawner: embassy_executor::Spawner) {
     spawner
         .spawn(crate::ui::ui_task(window.clone(), ui.as_weak()))
         .ok();
+    info!("Spawning DHT22 task");
+    let mut dht_pin = esp_hal::gpio::Flex::new(peripherals.GPIO5);
+    let output_config = esp_hal::gpio::OutputConfig::default()
+        .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
+        .with_pull(esp_hal::gpio::Pull::None);
+    dht_pin.apply_output_config(&output_config);
+    dht_pin.set_input_enable(true);
+    dht_pin.set_output_enable(true);
+    dht_pin.set_level(esp_hal::gpio::Level::High);
+
+    spawner.spawn(dht22::dht22_task(dht_pin)).ok();
 
     // === Touch Polling Integration ===
     info!("Starting continuous touch polling and Slint integration...");

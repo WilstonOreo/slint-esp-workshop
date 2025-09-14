@@ -59,7 +59,7 @@ pub async fn ui_task(
                 renderer.render_by_line(&mut hardware_buffer);
 
                 if frame_counter % 60 == 0 {
-                    log::debug!("Frame {} rendered to hardware display", frame_counter);
+                    log::debug!("Frame {frame_counter} rendered to hardware display");
                 }
             }) {
                 // Successfully rendered
@@ -69,10 +69,8 @@ pub async fn ui_task(
         });
 
         // If a frame was rendered, log it
-        if rendered {
-            if frame_counter % 60 == 0 {
-                log::debug!("Frame {frame_counter} rendered and displayed on M5Stack CoreS3");
-            }
+        if rendered && frame_counter % 60 == 0 {
+            log::debug!("Frame {frame_counter} rendered and displayed on M5Stack CoreS3");
         }
 
         frame_counter = frame_counter.wrapping_add(1);

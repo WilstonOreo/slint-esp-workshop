@@ -3,11 +3,10 @@ use core::sync::atomic::AtomicBool;
 use alloc::string::String;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
-use esp_hal::peripherals;
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
+use esp_wifi::EspWifiController;
 use esp_wifi::wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiController};
-use esp_wifi::{EspWifiController, EspWifiRngSource, EspWifiTimerSource};
 
 // Shared state for WiFi scan results
 pub static WIFI_SCAN_RESULTS: Mutex<CriticalSectionRawMutex, alloc::vec::Vec<AccessPointInfo>> =
@@ -67,7 +66,7 @@ pub async fn wifi_scan_task(mut wifi_controller: WifiController<'static>) {
                 }
             }
             Err(e) => {
-                log::info!("WiFi scan failed: {:?}", e);
+                log::info!("WiFi scan failed: {e:?}");
             }
         }
 
@@ -89,10 +88,9 @@ macro_rules! mk_static {
 pub fn create_wifi_controller<T: esp_hal::timer::timg::TimerGroupInstance>(
     timer: TimerGroup<'static, T>,
     rng: Rng,
-) -> &EspWifiController<'static> {
-    let esp_wifi_ctrl = &*mk_static!(
+) -> &'static EspWifiController<'static> {
+    &*mk_static!(
         esp_wifi::EspWifiController<'static>,
-        esp_wifi::init(timer.timer0, rng.clone()).expect("Failed to initialize WiFi")
-    );
-    esp_wifi_ctrl
+        esp_wifi::init(timer.timer0, rng).expect("Failed to initialize WiFi")
+    )
 }
