@@ -30,16 +30,8 @@ esp_bootloader_esp_idf::esp_app_desc!(
     u16::MAX
 );
 
-use alloc::boxed::Box;
-
 use core::{cell::RefCell, panic::PanicInfo};
-use log::{debug, error, info};
-use slint::{
-    PhysicalPosition,
-    platform::{PointerEventButton, WindowEvent},
-};
 
-use embassy_time::{Duration, Ticker};
 use esp_hal::rng::Rng;
 
 // ESP32 HAL imports - only what we need
@@ -56,13 +48,11 @@ use esp_hal::delay::Delay;
 
 // Touch controller imports
 use embedded_hal_bus::i2c::RefCellDevice;
-use ft3x68_rs::{Ft3x68Driver, TouchState};
 use static_cell::StaticCell;
-use touch::{FT6336U_DEVICE_ADDRESS, TouchResetDriverAW9523};
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    error!("PANIC: {info}");
+    log::error!("PANIC: {info}");
     loop {}
 }
 
@@ -80,13 +70,13 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // Initialize logger
     esp_println::logger::init_logger_from_env();
-    info!("Peripherals initialized");
+    log::info!("Peripherals initialized");
 
-    info!("Starting Slint ESP32 M5Stack CoreS3 Workshop");
+    log::info!("Starting Slint ESP32 M5Stack CoreS3 Workshop");
 
     // === Begin M5Stack CoreS3 Power Management and I2C Initialization ===
     // Initialize I2C bus for all I2C devices (AXP2101, AW9523, touch controller)
-    info!("Initializing I2C bus for power management and touch controller...");
+    log::info!("Initializing I2C bus for power management and touch controller...");
     let power_i2c = I2c::new(
         peripherals.I2C0,
         esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
@@ -94,7 +84,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     .unwrap()
     .with_sda(peripherals.GPIO12) // AXP2101 SDA
     .with_scl(peripherals.GPIO11); // AXP2101 SCL
-    info!("I2C bus initialized for power management and touch");
+    log::info!("I2C bus initialized for power management and touch");
 
     // Use StaticCell to create a shared I2C bus for all I2C devices (like the working example)
     static I2C_BUS: StaticCell<RefCell<I2c<'static, esp_hal::Blocking>>> = StaticCell::new();
@@ -109,31 +99,44 @@ async fn main(spawner: embassy_executor::Spawner) {
     // Small delay to let power rails stabilize after power management setup
     let mut delay = Delay::new();
     delay.delay_ms(100);
-    info!("Power management initialization complete, power rails stabilized");
+    log::info!("Power management initialization complete, power rails stabilized");
     // === End M5Stack CoreS3 Power Management Initialization ===
 
     // Initialize WiFi directly in main function
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let rng = Rng::new(peripherals.RNG);
 
-    info!("Initializing WiFi...");
+    log::info!("Initializing WiFi...");
     let esp_wifi_ctrl = wifi::create_wifi_controller(timg0, rng);
-    info!("WiFi controller initialized");
+    log::info!("WiFi controller initialized");
 
     let (wifi_controller, _interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, peripherals.WIFI)
         .expect("Failed to create WiFi interface");
-    info!("WiFi interface created");
+    log::info!("WiFi interface created");
 
     // Initialize embassy timer for task scheduling BEFORE spawning tasks
     use esp_hal::timer::systimer::SystemTimer;
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     esp_hal_embassy::init(systimer.alarm0);
-    info!("Embassy timer initialized");
+    log::info!("Embassy timer initialized");
+
+    // Initialize FT6336U touch driver using shared I2C bus (create fresh delay instance)
+
+    // Create touch reset driver using shared I2C bus
+    let touch_reset = crate::touch::TouchResetDriverAW9523::new(RefCellDevice::new(i2c_bus));
+    let touch_delay = esp_hal::delay::Delay::new();
+    let mut touch_driver = ft3x68_rs::Ft3x68Driver::new(
+        RefCellDevice::new(i2c_bus),
+        touch::FT6336U_DEVICE_ADDRESS,
+        touch_reset,
+        touch_delay,
+    );
+    touch_driver.initialize().ok();
 
     // Store WiFi controller for the wifi scan task
     let wifi_ctrl = wifi_controller;
     // Spawn WiFi scanning task
-    info!("Spawning WiFi scan task");
+    log::info!("Spawning WiFi scan task");
     spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
 
     // Initialize display hardware via display module
@@ -148,41 +151,16 @@ async fn main(spawner: embassy_executor::Spawner) {
     )
     .expect("Failed to initialize display hardware");
 
-    // Create custom Slint window and backend
-    let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(
-        slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
-    );
-    window.set_size(slint::PhysicalSize::new(
-        crate::display::LCD_H_RES as u32,
-        crate::display::LCD_V_RES as u32,
-    ));
-
-    let backend = Box::new(crate::app::EspEmbassyBackend::new(window.clone()));
-    slint::platform::set_platform(backend).expect("backend already initialized");
-    info!("Custom Slint backend initialized");
-
     // Initialize graphics hardware using display module
-    info!("=== Starting M5Stack CoreS3 Event Loop ===");
-    info!("Initializing M5Stack CoreS3 display hardware using display module...");
+    log::info!("=== Starting M5Stack CoreS3 Event Loop ===");
+    log::info!("Initializing M5Stack CoreS3 display hardware using display module...");
 
-    info!("M5Stack CoreS3 display hardware initialized via display module");
+    log::info!("M5Stack CoreS3 display hardware initialized via display module");
 
     // === Begin Touch Controller Initialization ===
-    info!("Initializing FT6336U touch controller...");
+    log::info!("Initializing FT6336U touch controller...");
 
-    // Create touch reset driver using shared I2C bus
-    let touch_reset = TouchResetDriverAW9523::new(RefCellDevice::new(i2c_bus));
-
-    // Initialize FT6336U touch driver using shared I2C bus (create fresh delay instance)
-    let touch_delay = Delay::new();
-    let mut touch_driver = Ft3x68Driver::new(
-        RefCellDevice::new(i2c_bus),
-        FT6336U_DEVICE_ADDRESS,
-        touch_reset,
-        touch_delay,
-    );
-
-    info!("Spawning DHT22 task");
+    log::info!("Spawning DHT22 task");
     let mut dht_pin = esp_hal::gpio::Flex::new(peripherals.GPIO5);
     let output_config = esp_hal::gpio::OutputConfig::default()
         .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
@@ -194,158 +172,12 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     spawner.spawn(dht22::dht22_task(dht_pin)).ok();
 
-    let app = crate::app::App::new();
-
-    use slint::ComponentHandle;
+    static APP: StaticCell<crate::app::App> = StaticCell::new();
+    let app = APP.init(crate::app::App::new());
 
     // Spawn graphics rendering task on same core
-    info!("Spawning graphics rendering task on Core 0");
-    spawner
-        .spawn(crate::app::ui_update_task(window.clone(), app.ui.as_weak()))
-        .ok();
+    log::info!("Spawning graphics rendering task on Core 0");
+    spawner.spawn(crate::app::ui_update_task(app)).ok();
 
-    // === Touch Polling Integration ===
-    info!("Starting continuous touch polling and Slint integration...");
-
-    let mut status_counter = 0u32;
-    let mut touch_ticker = Ticker::every(Duration::from_millis(16)); // ~60Hz touch polling
-    let mut last_touch_state = TouchState::Released;
-
-    let mut _touch_driver_for_task = match touch_driver.initialize() {
-        Ok(_) => {
-            info!("FT6336U touch controller initialized successfully");
-
-            // Test touch polling once to verify it's working
-            info!("Testing touch controller polling...");
-            match touch_driver.touch1() {
-                Ok(touch_state) => match touch_state {
-                    TouchState::Pressed(touch_point) => {
-                        info!(
-                            "Touch controller test: Touch detected at x={}, y={}",
-                            touch_point.x, touch_point.y
-                        );
-                    }
-                    TouchState::Released => {
-                        info!("Touch controller test: No touch detected (released state)");
-                    }
-                },
-                Err(e) => {
-                    info!("Touch controller test: No touch or error: {e:?}");
-                }
-            }
-            info!("Touch controller test completed - polling functionality verified");
-            info!("Touch events will now be logged when you touch the screen");
-            Some(touch_driver)
-        }
-        Err(e) => {
-            error!("Touch initialization failed: {e:?}");
-            info!("Continuing without touch functionality");
-            None
-        }
-    };
-    // === End Touch Controller Initialization ===
-
-    loop {
-        // Poll touch events if touch controller is available
-        if let Some(ref mut touch_driver) = _touch_driver_for_task {
-            match touch_driver.touch1() {
-                Ok(touch_state) => {
-                    match (&last_touch_state, &touch_state) {
-                        // Touch press event (transition from Released to Pressed)
-                        (TouchState::Released, TouchState::Pressed(touch_point)) => {
-                            let physical_position =
-                                PhysicalPosition::new(touch_point.x as i32, touch_point.y as i32);
-                            let logical_position =
-                                physical_position.to_logical(window.scale_factor());
-
-                            let pointer_event = WindowEvent::PointerPressed {
-                                position: logical_position,
-                                button: PointerEventButton::Left,
-                            };
-
-                            window.dispatch_event(pointer_event);
-                            info!(
-                                "Touch PRESSED at x={}, y={} (logical: {:.1}, {:.1}, scale_factor={})",
-                                touch_point.x,
-                                touch_point.y,
-                                logical_position.x,
-                                logical_position.y,
-                                window.scale_factor()
-                            );
-                        }
-                        // Touch release event (transition from Pressed to Released)
-                        (TouchState::Pressed(touch_point), TouchState::Released) => {
-                            // Use the last known touch position for the release event
-                            let physical_position =
-                                PhysicalPosition::new(touch_point.x as i32, touch_point.y as i32);
-                            let logical_position =
-                                physical_position.to_logical(window.scale_factor());
-
-                            // Send PointerReleased at the actual release position
-                            let pointer_released = WindowEvent::PointerReleased {
-                                position: logical_position,
-                                button: PointerEventButton::Left,
-                            };
-                            window.dispatch_event(pointer_released);
-
-                            // Also send PointerExited to complete the interaction cycle
-                            let pointer_exited = WindowEvent::PointerExited;
-                            window.dispatch_event(pointer_exited);
-
-                            info!(
-                                "Touch RELEASED at x={}, y={} (logical: {:.1}, {:.1}) + EXITED",
-                                touch_point.x,
-                                touch_point.y,
-                                logical_position.x,
-                                logical_position.y
-                            );
-                        }
-                        // Touch move event (both states are Pressed but potentially different positions)
-                        (TouchState::Pressed(old_point), TouchState::Pressed(new_point)) => {
-                            // Only dispatch move event if position actually changed
-                            if old_point.x != new_point.x || old_point.y != new_point.y {
-                                let physical_position =
-                                    PhysicalPosition::new(new_point.x as i32, new_point.y as i32);
-                                let logical_position =
-                                    physical_position.to_logical(window.scale_factor());
-
-                                let pointer_event = WindowEvent::PointerMoved {
-                                    position: logical_position,
-                                };
-
-                                window.dispatch_event(pointer_event);
-                                debug!(
-                                    "Touch MOVED to x={}, y={} (logical: {:.1}, {:.1}, scale_factor={})",
-                                    new_point.x,
-                                    new_point.y,
-                                    logical_position.x,
-                                    logical_position.y,
-                                    window.scale_factor()
-                                );
-                            }
-                        }
-                        // No state change
-                        _ => {}
-                    }
-
-                    last_touch_state = touch_state;
-                }
-                Err(_) => {
-                    // Touch polling error - don't spam logs, just continue
-                }
-            }
-        }
-
-        // Status logging (less frequent than touch polling)
-        if status_counter % 600 == 0 {
-            // Every ~10 seconds at 60Hz
-            info!(
-                "Main task status check #{} - M5Stack CoreS3 alive with touch polling",
-                status_counter / 60
-            );
-        }
-
-        status_counter += 1;
-        touch_ticker.next().await;
-    }
+    app.run(touch_driver).await
 }

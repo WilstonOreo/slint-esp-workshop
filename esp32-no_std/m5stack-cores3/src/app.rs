@@ -3,8 +3,9 @@ use alloc::rc::Rc;
 use alloc::vec;
 
 use embassy_time::{Duration, Ticker};
+use ft3x68_rs::Ft3x68Driver;
 // Slint platform imports
-use slint::platform::software_renderer::Rgb565Pixel;
+use slint::platform::software_renderer::{MinimalSoftwareWindow, Rgb565Pixel};
 
 use crate::dht22;
 
@@ -12,10 +13,25 @@ slint::include_modules!();
 
 pub struct App {
     pub ui: MainWindow,
+    pub window: Rc<MinimalSoftwareWindow>,
 }
 
 impl App {
     pub fn new() -> Self {
+        // Create custom Slint window and backend
+        let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(
+            slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
+        );
+        window.set_size(slint::PhysicalSize::new(
+            crate::display::LCD_H_RES as u32,
+            crate::display::LCD_V_RES as u32,
+        ));
+
+        let backend = Box::new(EspEmbassyBackend::new(window.clone()));
+
+        slint::platform::set_platform(backend).expect("backend already initialized");
+        log::info!("Custom Slint backend initialized");
+
         let ui = MainWindow::new().unwrap();
 
         // Create empty WiFi network model with some placeholder data
@@ -71,18 +87,132 @@ impl App {
         // Trigger initial refresh
         ui.invoke_wifi_refresh();
 
-        Self { ui }
+        Self { ui, window }
     }
 
-    pub fn run(&self) {}
+    pub async fn run<I2C, D, RST>(&self, mut touch_driver: Ft3x68Driver<I2C, D, RST>)
+    where
+        I2C: embedded_hal::i2c::I2c,
+        D: embedded_hal::delay::DelayNs,
+        RST: ft3x68_rs::ResetInterface,
+    {
+        use ft3x68_rs::*;
+        let mut status_counter = 0u32;
+        let mut touch_ticker = Ticker::every(Duration::from_millis(16)); // ~60Hz touch polling
+        let mut last_touch_state = TouchState::Released;
+
+        use slint::*;
+
+        loop {
+            // Poll touch events if touch controller is available
+            match touch_driver.touch1() {
+                Ok(touch_state) => {
+                    match (&last_touch_state, &touch_state) {
+                        // Touch press event (transition from Released to Pressed)
+                        (TouchState::Released, TouchState::Pressed(touch_point)) => {
+                            let physical_position =
+                                PhysicalPosition::new(touch_point.x as i32, touch_point.y as i32);
+                            let logical_position =
+                                physical_position.to_logical(self.window.scale_factor());
+
+                            let pointer_event = platform::WindowEvent::PointerPressed {
+                                position: logical_position,
+                                button: platform::PointerEventButton::Left,
+                            };
+
+                            self.window.dispatch_event(pointer_event);
+                            log::info!(
+                                "Touch PRESSED at x={}, y={} (logical: {:.1}, {:.1}, scale_factor={})",
+                                touch_point.x,
+                                touch_point.y,
+                                logical_position.x,
+                                logical_position.y,
+                                self.window.scale_factor()
+                            );
+                        }
+                        // Touch release event (transition from Pressed to Released)
+                        (TouchState::Pressed(touch_point), TouchState::Released) => {
+                            // Use the last known touch position for the release event
+                            let physical_position =
+                                PhysicalPosition::new(touch_point.x as i32, touch_point.y as i32);
+                            let logical_position =
+                                physical_position.to_logical(self.window.scale_factor());
+
+                            // Send PointerReleased at the actual release position
+                            let pointer_released = platform::WindowEvent::PointerReleased {
+                                position: logical_position,
+                                button: platform::PointerEventButton::Left,
+                            };
+                            self.window.dispatch_event(pointer_released);
+
+                            // Also send PointerExited to complete the interaction cycle
+                            let pointer_exited = platform::WindowEvent::PointerExited;
+                            self.window.dispatch_event(pointer_exited);
+
+                            log::info!(
+                                "Touch RELEASED at x={}, y={} (logical: {:.1}, {:.1}) + EXITED",
+                                touch_point.x,
+                                touch_point.y,
+                                logical_position.x,
+                                logical_position.y
+                            );
+                        }
+                        // Touch move event (both states are Pressed but potentially different positions)
+                        (TouchState::Pressed(old_point), TouchState::Pressed(new_point)) => {
+                            // Only dispatch move event if position actually changed
+                            if old_point.x != new_point.x || old_point.y != new_point.y {
+                                let physical_position =
+                                    PhysicalPosition::new(new_point.x as i32, new_point.y as i32);
+                                let logical_position =
+                                    physical_position.to_logical(self.window.scale_factor());
+
+                                let pointer_event = platform::WindowEvent::PointerMoved {
+                                    position: logical_position,
+                                };
+
+                                self.window.dispatch_event(pointer_event);
+                                log::debug!(
+                                    "Touch MOVED to x={}, y={} (logical: {:.1}, {:.1}, scale_factor={})",
+                                    new_point.x,
+                                    new_point.y,
+                                    logical_position.x,
+                                    logical_position.y,
+                                    self.window.scale_factor()
+                                );
+                            }
+                        }
+                        // No state change
+                        _ => {}
+                    }
+
+                    last_touch_state = touch_state;
+                }
+                Err(_) => {
+                    // Touch polling error - don't spam logs, just continue
+                }
+            }
+
+            // Status logging (less frequent than touch polling)
+            if status_counter % 600 == 0 {
+                // Every ~10 seconds at 60Hz
+                log::info!(
+                    "Main task status check #{} - M5Stack CoreS3 alive with touch polling",
+                    status_counter / 60
+                );
+            }
+
+            status_counter += 1;
+            touch_ticker.next().await;
+        }
+    }
 }
 
 // Graphics rendering task - handles display output only
 #[embassy_executor::task]
-pub async fn ui_update_task(
-    window: Rc<slint::platform::software_renderer::MinimalSoftwareWindow>,
-    ui: slint::Weak<MainWindow>,
-) {
+pub async fn ui_update_task(app: &'static App) {
+    let window = app.window.clone();
+    let ui = app.ui.as_weak();
+
     log::info!("=== UI rendering task started ====");
     use crate::display::*;
 
