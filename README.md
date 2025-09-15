@@ -131,34 +131,6 @@ Install the Slint extension from the extensions marketplace.
 - **WiFi ready** - Stub implementation ready for WiFi functionality
 - **Embassy async runtime** - Modern async/await support for embedded
 
-## Environment Setup for ESP32-S3 (no_std Bare-Metal)
-
-To build the application for ESP32-S3 boards using no_std bare-metal, switch into the `esp32` directory.
-
-Make sure to install the required Rust components for the ESP32-S3 target:
-
-```sh
-rustup target add xtensa-esp32s3-none-elf
-```
-
-You should also have `espflash` installed for flashing the device:
-
-```sh
-cargo install espflash
-```
-
-Once set up, build the project:
-
-```sh
-cargo build --release
-```
-
-Flash the application using:
-
-```sh
-cargo espflash --release --chip esp32s3
-```
-
 ## No_std Implementation Details
 
 This workshop uses a **no_std** bare-metal implementation, which means:
