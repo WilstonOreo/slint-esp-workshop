@@ -237,7 +237,7 @@ pub async fn ui_update_task(app: &'static App) {
             }
         }
 
-        // Check for new WiFi scan results and trigger UI refresh if available
+        // Check for new weather record and update UI.
         if let Some(main_window) = ui.upgrade() {
             log::debug!("Triggered UI refresh for new weather record");
             let reading = dht22::DHT22_CHANNEL.receive().await;

@@ -123,6 +123,8 @@ async fn main(spawner: embassy_executor::Spawner) {
     // Initialize FT6336U touch driver using shared I2C bus (create fresh delay instance)
 
     // Create touch reset driver using shared I2C bus
+
+    log::info!("Initializing FT6336U touch controller...");
     let touch_reset = crate::touch::TouchResetDriverAW9523::new(RefCellDevice::new(i2c_bus));
     let touch_delay = esp_hal::delay::Delay::new();
     let mut touch_driver = ft3x68_rs::Ft3x68Driver::new(
@@ -133,12 +135,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     );
     touch_driver.initialize().ok();
 
-    // Store WiFi controller for the wifi scan task
-    let wifi_ctrl = wifi_controller;
-    // Spawn WiFi scanning task
-    log::info!("Spawning WiFi scan task");
-    spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
-
+    log::info!("Initializing M5Stack CoreS3 display hardware using display module...");
     // Initialize display hardware via display module
     display::init_display_hardware(
         peripherals.GPIO3,  // cs
@@ -153,31 +150,32 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // Initialize graphics hardware using display module
     log::info!("=== Starting M5Stack CoreS3 Event Loop ===");
-    log::info!("Initializing M5Stack CoreS3 display hardware using display module...");
 
     log::info!("M5Stack CoreS3 display hardware initialized via display module");
 
-    // === Begin Touch Controller Initialization ===
-    log::info!("Initializing FT6336U touch controller...");
+    log::info!("Spawning WiFi scan task");
+    spawner.spawn(wifi::wifi_scan_task(wifi_controller)).ok();
 
     log::info!("Spawning DHT22 task");
-    let mut dht_pin = esp_hal::gpio::Flex::new(peripherals.GPIO5);
-    let output_config = esp_hal::gpio::OutputConfig::default()
-        .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
-        .with_pull(esp_hal::gpio::Pull::None);
+    use esp_hal::gpio::*;
+    let mut dht_pin = Flex::new(peripherals.GPIO5);
+    let output_config = OutputConfig::default()
+        .with_drive_mode(DriveMode::OpenDrain)
+        .with_pull(Pull::None);
     dht_pin.apply_output_config(&output_config);
     dht_pin.set_input_enable(true);
     dht_pin.set_output_enable(true);
-    dht_pin.set_level(esp_hal::gpio::Level::High);
+    dht_pin.set_level(Level::High);
 
     spawner.spawn(dht22::dht22_task(dht_pin)).ok();
 
-    static APP: StaticCell<crate::app::App> = StaticCell::new();
-    let app = APP.init(crate::app::App::new());
+    use crate::app::*;
+    static APP: StaticCell<App> = StaticCell::new();
+    let app = APP.init(App::new());
 
     // Spawn graphics rendering task on same core
     log::info!("Spawning graphics rendering task on Core 0");
-    spawner.spawn(crate::app::ui_update_task(app)).ok();
+    spawner.spawn(ui_update_task(app)).ok();
 
     app.run(touch_driver).await
 }
