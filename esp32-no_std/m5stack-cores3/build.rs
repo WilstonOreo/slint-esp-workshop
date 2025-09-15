@@ -1,12 +1,7 @@
 fn main() {
-    // Build Slint UI files
-    println!("cargo:rerun-if-changed=appwindow.slint");
-    println!("cargo:rerun-if-changed=../ui/widgets.slint");
-    println!("cargo:rerun-if-changed=../ui/viewmodel.slint");
-
     let config = slint_build::CompilerConfiguration::new()
         .embed_resources(slint_build::EmbedResourcesKind::EmbedForSoftwareRenderer);
-    slint_build::compile_with_config("appwindow.slint", config).unwrap();
+    slint_build::compile_with_config("ui/mainwindow.slint", config).unwrap();
 
     linker_be_nice();
 }
