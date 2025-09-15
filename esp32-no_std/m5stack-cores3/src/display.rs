@@ -24,6 +24,11 @@ unsafe impl Sync for DisplayComponentsContainer {}
 
 pub static DISPLAY_COMPONENTS: DisplayComponentsContainer = DisplayComponentsContainer::new();
 
+// Display constants for M5Stack CoreS3 - 320x240 ILI9341
+pub const LCD_H_RES: u16 = 320;
+pub const LCD_V_RES: u16 = 240;
+pub const LCD_BUFFER_SIZE: usize = (LCD_H_RES as usize) * (LCD_H_RES as usize);
+
 pub struct DisplayComponentsContainer {
     inner: UnsafeCell<Option<DisplayHardware>>,
 }

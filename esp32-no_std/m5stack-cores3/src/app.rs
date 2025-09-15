@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
+use alloc::vec;
 
 use embassy_time::{Duration, Ticker};
 // Slint platform imports
@@ -7,12 +8,74 @@ use slint::platform::software_renderer::Rgb565Pixel;
 
 use crate::dht22;
 
-// Display constants for M5Stack CoreS3 - 320x240 ILI9341
-const LCD_H_RES: u16 = 320;
-const LCD_V_RES: u16 = 240;
-const LCD_BUFFER_SIZE: usize = (LCD_H_RES as usize) * (LCD_H_RES as usize);
-
 slint::include_modules!();
+
+pub struct App {
+    pub ui: MainWindow,
+}
+
+impl App {
+    pub fn new() -> Self {
+        let ui = MainWindow::new().unwrap();
+
+        // Create empty WiFi network model with some placeholder data
+        let placeholder_networks = vec![
+            WifiNetwork {
+                ssid: "WiFi Scanning...".into(),
+            },
+            WifiNetwork {
+                ssid: "Please wait".into(),
+            },
+        ];
+
+        let wifi_model = Rc::new(slint::VecModel::<WifiNetwork>::from(placeholder_networks));
+        ui.set_wifi_network_model(wifi_model.clone().into());
+
+        // Set up WiFi refresh handler with real WiFi functionality
+        ui.on_wifi_refresh(move || {
+            log::info!("WiFi refresh requested - checking for scan results");
+
+            // Check if we have new scan results
+            if crate::wifi::WIFI_SCAN_UPDATED.load(core::sync::atomic::Ordering::Relaxed) {
+                // Access the scan results
+                let scan_results = crate::wifi::WIFI_SCAN_RESULTS.try_lock();
+                if let Ok(results) = scan_results {
+                    let mut networks = alloc::vec::Vec::new();
+
+                    for ap in results.iter() {
+                        networks.push(WifiNetwork {
+                            ssid: ap.ssid.as_str().into(),
+                        });
+                    }
+
+                    if networks.is_empty() {
+                        networks.push(WifiNetwork {
+                            ssid: "No networks found".into(),
+                        });
+                    }
+
+                    log::info!("Updated UI with {} real networks", networks.len());
+                    wifi_model.set_vec(networks);
+
+                    // Reset the update flag
+                    crate::wifi::WIFI_SCAN_UPDATED
+                        .store(false, core::sync::atomic::Ordering::Relaxed);
+                } else {
+                    log::info!("Could not access scan results (locked)");
+                }
+            } else {
+                log::info!("No new scan results available");
+            }
+        });
+
+        // Trigger initial refresh
+        ui.invoke_wifi_refresh();
+
+        Self { ui }
+    }
+
+    pub fn run(&self) {}
+}
 
 // Graphics rendering task - handles display output only
 #[embassy_executor::task]
@@ -21,6 +84,7 @@ pub async fn ui_update_task(
     ui: slint::Weak<MainWindow>,
 ) {
     log::info!("=== UI rendering task started ====");
+    use crate::display::*;
 
     let mut ticker = Ticker::every(Duration::from_millis(16)); // ~60fps
     let mut frame_counter = 0u32;
@@ -48,7 +112,7 @@ pub async fn ui_update_task(
             log::debug!("Triggered UI refresh for new weather record");
             let reading = dht22::DHT22_CHANNEL.receive().await;
             log::info!("Update weather UI");
-            main_window.set_weather_record(crate::ui::WeatherRecord {
+            main_window.set_weather_record(WeatherRecord {
                 temperature_celsius: reading.temperature,
                 humidity_percent: reading.relative_humidity,
             });

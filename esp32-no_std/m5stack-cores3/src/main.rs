@@ -4,11 +4,11 @@
 extern crate alloc;
 extern crate esp_bootloader_esp_idf;
 
+mod app;
 mod dht22;
 mod display;
 mod init;
 mod touch;
-mod ui;
 mod wifi;
 
 esp_bootloader_esp_idf::esp_app_desc!(
@@ -31,8 +31,7 @@ esp_bootloader_esp_idf::esp_app_desc!(
 );
 
 use alloc::boxed::Box;
-use alloc::rc::Rc;
-use alloc::vec;
+
 use core::{cell::RefCell, panic::PanicInfo};
 use log::{debug, error, info};
 use slint::{
@@ -40,8 +39,6 @@ use slint::{
     platform::{PointerEventButton, WindowEvent},
 };
 
-// WiFi imports - simplified
-use core::sync::atomic::Ordering;
 use embassy_time::{Duration, Ticker};
 use esp_hal::rng::Rng;
 
@@ -135,83 +132,9 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // Store WiFi controller for the wifi scan task
     let wifi_ctrl = wifi_controller;
-
-    // Create custom Slint window and backend
-    let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(
-        slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
-    );
-    window.set_size(slint::PhysicalSize::new(320, 240));
-
-    let backend = Box::new(crate::ui::EspEmbassyBackend::new(window.clone()));
-    slint::platform::set_platform(backend).expect("backend already initialized");
-    info!("Custom Slint backend initialized");
-
-    // Initial liveness check
-    info!("System initialization complete - M5Stack CoreS3 is alive and ready");
-    // Create the UI
-    let ui = crate::ui::MainWindow::new().unwrap();
-
-    // Create empty WiFi network model with some placeholder data
-    let placeholder_networks = vec![
-        crate::ui::WifiNetwork {
-            ssid: "WiFi Scanning...".into(),
-        },
-        crate::ui::WifiNetwork {
-            ssid: "Please wait".into(),
-        },
-    ];
-
-    let wifi_model = Rc::new(slint::VecModel::<crate::ui::WifiNetwork>::from(
-        placeholder_networks,
-    ));
-    ui.set_wifi_network_model(wifi_model.clone().into());
-
-    // Set up WiFi refresh handler with real WiFi functionality
-    ui.on_wifi_refresh(move || {
-        info!("WiFi refresh requested - checking for scan results");
-
-        // Check if we have new scan results
-        if crate::wifi::WIFI_SCAN_UPDATED.load(Ordering::Relaxed) {
-            // Access the scan results
-            let scan_results = crate::wifi::WIFI_SCAN_RESULTS.try_lock();
-            if let Ok(results) = scan_results {
-                let mut networks = alloc::vec::Vec::new();
-
-                for ap in results.iter() {
-                    networks.push(crate::ui::WifiNetwork {
-                        ssid: ap.ssid.as_str().into(),
-                    });
-                }
-
-                if networks.is_empty() {
-                    networks.push(crate::ui::WifiNetwork {
-                        ssid: "No networks found".into(),
-                    });
-                }
-
-                info!("Updated UI with {} real networks", networks.len());
-                wifi_model.set_vec(networks);
-
-                // Reset the update flag
-                crate::wifi::WIFI_SCAN_UPDATED.store(false, Ordering::Relaxed);
-            } else {
-                info!("Could not access scan results (locked)");
-            }
-        } else {
-            info!("No new scan results available");
-        }
-    });
-
-    // Trigger initial refresh
-    ui.invoke_wifi_refresh();
-
     // Spawn WiFi scanning task
     info!("Spawning WiFi scan task");
     spawner.spawn(wifi::wifi_scan_task(wifi_ctrl)).ok();
-
-    // Initialize graphics hardware using display module
-    info!("=== Starting M5Stack CoreS3 Event Loop ===");
-    info!("Initializing M5Stack CoreS3 display hardware using display module...");
 
     // Initialize display hardware via display module
     display::init_display_hardware(
@@ -224,6 +147,23 @@ async fn main(spawner: embassy_executor::Spawner) {
         peripherals.SPI2,   // SPI peripheral
     )
     .expect("Failed to initialize display hardware");
+
+    // Create custom Slint window and backend
+    let window = slint::platform::software_renderer::MinimalSoftwareWindow::new(
+        slint::platform::software_renderer::RepaintBufferType::ReusedBuffer,
+    );
+    window.set_size(slint::PhysicalSize::new(
+        crate::display::LCD_H_RES as u32,
+        crate::display::LCD_V_RES as u32,
+    ));
+
+    let backend = Box::new(crate::app::EspEmbassyBackend::new(window.clone()));
+    slint::platform::set_platform(backend).expect("backend already initialized");
+    info!("Custom Slint backend initialized");
+
+    // Initialize graphics hardware using display module
+    info!("=== Starting M5Stack CoreS3 Event Loop ===");
+    info!("Initializing M5Stack CoreS3 display hardware using display module...");
 
     info!("M5Stack CoreS3 display hardware initialized via display module");
 
@@ -241,6 +181,35 @@ async fn main(spawner: embassy_executor::Spawner) {
         touch_reset,
         touch_delay,
     );
+
+    info!("Spawning DHT22 task");
+    let mut dht_pin = esp_hal::gpio::Flex::new(peripherals.GPIO5);
+    let output_config = esp_hal::gpio::OutputConfig::default()
+        .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
+        .with_pull(esp_hal::gpio::Pull::None);
+    dht_pin.apply_output_config(&output_config);
+    dht_pin.set_input_enable(true);
+    dht_pin.set_output_enable(true);
+    dht_pin.set_level(esp_hal::gpio::Level::High);
+
+    spawner.spawn(dht22::dht22_task(dht_pin)).ok();
+
+    let app = crate::app::App::new();
+
+    use slint::ComponentHandle;
+
+    // Spawn graphics rendering task on same core
+    info!("Spawning graphics rendering task on Core 0");
+    spawner
+        .spawn(crate::app::ui_update_task(window.clone(), app.ui.as_weak()))
+        .ok();
+
+    // === Touch Polling Integration ===
+    info!("Starting continuous touch polling and Slint integration...");
+
+    let mut status_counter = 0u32;
+    let mut touch_ticker = Ticker::every(Duration::from_millis(16)); // ~60Hz touch polling
+    let mut last_touch_state = TouchState::Released;
 
     let mut _touch_driver_for_task = match touch_driver.initialize() {
         Ok(_) => {
@@ -275,34 +244,6 @@ async fn main(spawner: embassy_executor::Spawner) {
         }
     };
     // === End Touch Controller Initialization ===
-
-    // Note: WiFi task already spawned above
-
-    use slint::ComponentHandle;
-
-    // Spawn graphics rendering task on same core
-    info!("Spawning graphics rendering task on Core 0");
-    spawner
-        .spawn(crate::ui::ui_update_task(window.clone(), ui.as_weak()))
-        .ok();
-    info!("Spawning DHT22 task");
-    let mut dht_pin = esp_hal::gpio::Flex::new(peripherals.GPIO5);
-    let output_config = esp_hal::gpio::OutputConfig::default()
-        .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
-        .with_pull(esp_hal::gpio::Pull::None);
-    dht_pin.apply_output_config(&output_config);
-    dht_pin.set_input_enable(true);
-    dht_pin.set_output_enable(true);
-    dht_pin.set_level(esp_hal::gpio::Level::High);
-
-    spawner.spawn(dht22::dht22_task(dht_pin)).ok();
-
-    // === Touch Polling Integration ===
-    info!("Starting continuous touch polling and Slint integration...");
-
-    let mut status_counter = 0u32;
-    let mut touch_ticker = Ticker::every(Duration::from_millis(16)); // ~60Hz touch polling
-    let mut last_touch_state = TouchState::Released;
 
     loop {
         // Poll touch events if touch controller is available
