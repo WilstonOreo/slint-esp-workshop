@@ -4,7 +4,7 @@ This is a Rust Slint Workshop template supporting multiple ESP32-S3 boards with 
 
 ## Directory Structure
 
-```
+```tree
 slint-esp-workshop/
 ├── README.md
 ├── Cargo.toml (workspace)
@@ -20,7 +20,7 @@ slint-esp-workshop/
 │   └── no_std/                  # No standard library implementations (bare-metal)
 │       ├── esp32-s3-box-3/      # ESP32-S3-BOX-3 no_std implementation
 │       ├── esope-sld-c-w-s3/    # ESoPE board no_std implementation
-│       ├── m5stack-cores3/      # M5Stack CoreS3 no_std implementation (planned)
+│       ├── m5stack-cores3/      # M5Stack CoreS3 no_std implementation
 │       └── esp32-s3-lcd-ev-board/ # LCD-EV board no_std implementation (planned)
 ├── wasm/                        # WebAssembly implementation
 └── android/                     # Android implementation
@@ -29,11 +29,13 @@ slint-esp-workshop/
 ## Supported Boards
 
 ### Currently Implemented
+
 - **ESP32-S3-BOX-3** (std + no_std)
 - **ESoPE-SLD-C-W-S3** (no_std)
+- **M5Stack-CoreS3** (no_std)
 
 ### Planned
-- **M5Stack CoreS3**
+
 - **ESP32-S3-LCD-EV-BOARD**
 
 ## Quick Start
@@ -63,7 +65,9 @@ cargo run --release
 ## Std vs No_std: Which to Choose?
 
 ### No_std (Bare-Metal) - `esp32/no_std/` - **RECOMMENDED**
+
 **Pros:**
+
 - ✅ **Much simpler setup** - No C/C++ toolchain required
 - ✅ **Pure Rust** - No ESP-IDF complexity  
 - ✅ Smaller binary size and memory footprint
@@ -76,15 +80,19 @@ cargo run --release
 - ✅ **No_std ecosystem** designed for embedded/portable use
 
 **Cons:**
+
 - ❌ Some std-only crates not available (though embedded alternatives exist)
 
 ### Std (ESP-IDF) - `esp32/std/`  
+
 **Pros:**
+
 - ✅ Familiar Rust std library
 - ✅ Access to std-only crates
 - ✅ Built-in WiFi/networking stack
 
 **Cons:**
+
 - ❌ **Complex setup** - Requires full C/C++ ESP-IDF toolchain
 - ❌ **Much more complex** - ESP-IDF brings C/C++ complications
 - ❌ Larger binary size
@@ -114,13 +122,6 @@ cargo install espflash
 ### VSCode setup
 
 Install the Slint extension from the extensions marketplace.
-
-## Repository structure
-
-- `winit` - Application code for `winit` based platforms, e.g. desktop environments.
-- `esp32` - **no_std** bare-metal application code for ESP32-S3 boards using esp-hal 1.0.0.beta.1.
-- `ui` - Shared Slint code for the UI.
-- `model` - Crate with shared Rust code for the ESP32 and desktop applications (no_std compatible).
 
 ## Features
 
@@ -178,6 +179,7 @@ This workshop uses a **no_std** bare-metal implementation, which means:
 ### Build Configuration
 
 The project uses:
+
 - **Target**: `xtensa-esp32s3-none-elf` (bare-metal, no std)
 - **Build std**: `["alloc", "core"]` for no_std with allocation
 - **Custom linker scripts** - For proper memory layout
@@ -233,13 +235,13 @@ wsl --install
 
 Open a new WSL shell and do the following steps:
 
-#### 1. Update dependencies 
+#### 1. Update dependencies
 
 ```sh
 sudo apt update && sudo apt upgrade -y
 ```
 
-#### 2. Install rust:
+#### 2. Install rust
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -254,7 +256,7 @@ sudo apt install git wget libxkbcommon-x11-dev python3 python3-pip python3-venv 
 
 #### 4. Install cargo dependencies
 
-Install these dependencies required to set up the ESP toolchain: 
+Install these dependencies required to set up the ESP toolchain:
 
 ```sh
 cargo install espup # ESP toolchain setup
@@ -262,9 +264,9 @@ cargo install espflash # Flashing tool
 cargo install cargo-generate # Required to actually check out the template
 ```
 
-####  5. Set up ESP toolchain
+#### 5. Set up ESP toolchain
 
-Change the directory to the root of this repository. 
+Change the directory to the root of this repository.
 You need to set up the ESP toolchain and initialize the environment:
 
 ```sh
@@ -276,14 +278,14 @@ You should now be able to build the project with `cargo build --release`.
 
 #### 6. Install usbipd for flashing the device
 
-* Download the installer at: https://github.com/dorssel/usbipd-win/releases/
-* Assuming your ESP32 is connected to your computer, open a PowerShell as administrator and list the USB devices:
+- Download the installer at: <https://github.com/dorssel/usbipd-win/releases/>
+- Assuming your ESP32 is connected to your computer, open a PowerShell as administrator and list the USB devices:
 
 ```ps1
 usbipd list
 ```
 
-If everything is correctly connected and installed, a list of the  something similar on the console: 
+If everything is correctly connected and installed, a list of the  something similar on the console:
 
 ```console
   2-9    303a:1001  USB Serial Device (COM8), USB JTAG/serial debug unit          Not shared
@@ -325,7 +327,7 @@ The workshop application includes:
 
 ### I2C EEPROM Errors
 
-If you encounter `I2C(AcknowledgeCheckFailed(Address))` errors with the ESoPE board:
+If you encounter `I2C(AcknowledgeCheckFailed(Address))` errors with the board:
 
 1. **Switch to ESP32-S3-BOX-3** (default) - This board doesn't require EEPROM
 2. **Check hardware connections** - Ensure I2C pins are properly connected
