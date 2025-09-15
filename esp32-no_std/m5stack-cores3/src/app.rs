@@ -7,8 +7,6 @@ use ft3x68_rs::Ft3x68Driver;
 // Slint platform imports
 use slint::platform::software_renderer::{MinimalSoftwareWindow, Rgb565Pixel};
 
-use crate::dht22;
-
 slint::include_modules!();
 
 pub struct App {
@@ -235,17 +233,6 @@ pub async fn ui_update_task(app: &'static App) {
                 ui_strong.invoke_wifi_refresh();
                 log::debug!("Triggered UI refresh for new WiFi scan results");
             }
-        }
-
-        // Check for new weather record and update UI.
-        if let Some(main_window) = ui.upgrade() {
-            log::debug!("Triggered UI refresh for new weather record");
-            let reading = dht22::DHT22_CHANNEL.receive().await;
-            log::info!("Update weather UI");
-            main_window.set_weather_record(WeatherRecord {
-                temperature_celsius: reading.temperature,
-                humidity_percent: reading.relative_humidity,
-            });
         }
 
         // Render the frame using the hardware display

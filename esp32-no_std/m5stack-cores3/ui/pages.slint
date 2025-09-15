@@ -1,6 +1,6 @@
 // This slint file contains all the UI pages of the application.
 
-import { Page, WifiNetworkWidget, TemperatureBar, HumidityBar } from "widgets.slint";
+import { Page, WifiNetworkWidget } from "widgets.slint";
 import { ListView, VerticalBox, Button, HorizontalBox } from "std-widgets.slint";
 
 import { WifiNetwork } from "viewmodel.slint";
@@ -30,27 +30,5 @@ export component WifiNetworkPage inherits Page {
         model: root.model;
         // Set explicit height to leave space for header and button
         height: parent.height - 80px;
-    }
-}
-
-/// The temperature page displays the current temperature and humidity.
-export component TemperaturePage inherits Page {
-    /// The current temperature in Celsius.
-    in property temperature-celsius <=> temperature-bar.value;
-
-    /// The current humidity in percent.
-    in property has-temperature <=> temperature-bar.has-value;
-
-    /// The current humidity in percent.
-    in property humidity-percent <=> humidity-bar.value;
-
-    /// The current humidity in percent.
-    in property has-humidity <=> humidity-bar.has-value;
-
-    /// The two bars are displayed side by side.
-    HorizontalBox {
-        temperature-bar := TemperatureBar { }
-
-        humidity-bar := HumidityBar { }
     }
 }

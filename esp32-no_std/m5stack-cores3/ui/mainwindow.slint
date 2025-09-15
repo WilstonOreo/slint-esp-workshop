@@ -1,11 +1,10 @@
 import { Switch, TabWidget, AboutSlint } from "std-widgets.slint";
-import { WifiNetworkPage, TemperaturePage } from "pages.slint";
+import { WifiNetworkPage } from "pages.slint";
 
-import { WifiNetwork, WeatherRecord } from "viewmodel.slint";
+import { WifiNetwork } from "viewmodel.slint";
 
 export component MainWindow inherits Window {
     in property <[WifiNetwork]> wifi_network_model;
-    in property <WeatherRecord> weather-record;
 
     callback wifi_refresh;
     public function invoke_wifi_refresh() {
@@ -13,14 +12,6 @@ export component MainWindow inherits Window {
     }
 
     TabWidget {
-        Tab {
-            title: "Temperature";
-
-            TemperaturePage {
-                temperature-celsius: weather-record.temperature_celsius;
-                humidity-percent: weather-record.humidity_percent;
-            }
-        }
 
         Tab {
             title: @tr("Wifi");
