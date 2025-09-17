@@ -171,7 +171,7 @@ sudo apt install wget flex bison gperf cmake ninja-build ccache libffi-dev dfu-u
 #### 2. Install ESP toolchain for Rust
 
 ```sh
-cargo install espup # ESP toolchain setup
+cargo install espup --locked # ESP toolchain setup
 cargo install espflash # Flashing tool
 ```
 
